@@ -13,9 +13,6 @@ def SystDiffEq(y, t, P, l, c, mu, g):
     ds = y[2]
     dphi = y[3]
 
-    # a11 * s'' + a12 * phi'' = b1
-    # a21 * s'' + a22 * phi'' = b2
-
     a11 = 1
     a12 = 0
     a21 = 0
