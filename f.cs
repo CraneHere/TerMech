@@ -1,13 +1,18 @@
-protected override void OnRenderFrame(FrameEventArgs args)
+string vertexShaderCode = @"
+#version 330 core
+
+uniform mat4 ModelViewMatrix; // Матрица трансформации
+
+layout (location = 0) in vec2 aPosition;
+layout (location = 1) in vec4 aColor;
+
+out vec4 vColor;
+
+void main()
 {
-    GL.Clear(ClearBufferMask.ColorBufferBit);
-
-    GL.UseProgram(this.shaderProgram.ShaderProgramHandle);
-
-    GL.BindVertexArray(this.vertexArray.VertexArrayHandle);
-    GL.BindBuffer(BufferTarget.ElementArrayBuffer, this.indexBuffer.IndexBufferHandle);
-    GL.DrawElements(PrimitiveType.Triangles, this.indexCount, DrawElementsType.UnsignedInt, 0);
-
-    this.Context.SwapBuffers();
-    base.OnRenderFrame(args);
+    // Применение матрицы трансформации к координатам вершины
+    vec4 transformedPosition = ModelViewMatrix * vec4(aPosition, 0.0, 1.0);
+    gl_Position = transformedPosition;
+    vColor = aColor;
 }
+";
