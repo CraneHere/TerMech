@@ -1,10 +1,10 @@
-protected override void OnUpdateFrame(FrameEventArgs args)
+ protected override void OnUpdateFrame(FrameEventArgs args)
         {
-            // Обновляем время для анимации
-            elapsedTime += (float)args.Time;
-            moveSpeed = 50.0f * elapsedTime; // Перемещение вдоль оси X на 50 пикселей в секунду
-
-            ApplyTransformation();
+            // Обновляем координаты текущих вершин, чтобы перемещать шестиугольник
+            for (int i = 0; i < currentShape.Length; i++)
+            {
+                currentShape[i] += movementDirection; // Добавляем смещение к каждой вершине
+            }
 
             // Обновляем буфер вершин с новыми координатами
             VertexPositionColor[] vertices = new VertexPositionColor[this.currentShape.Length];
@@ -16,18 +16,4 @@ protected override void OnUpdateFrame(FrameEventArgs args)
             this.vertexBuffer.SetData(vertices, vertices.Length);
 
             base.OnUpdateFrame(args);
-        }
-
-        private void ApplyTransformation()
-        {
-            // Создаем матрицу трансляции, перемещающую шестиугольник
-            translationMatrix = Matrix4.CreateTranslation(moveSpeed, 0, 0); // Перемещение вдоль оси X
-
-            for (int i = 0; i < currentShape.Length; i++)
-            {
-                // Преобразуем 2D-вектор в 4D-вектор, чтобы применить матрицу 4x4
-                Vector4 vertex = new Vector4(currentShape[i].X, currentShape[i].Y, 0, 1);
-                Vector4 transformedVertex = translationMatrix * vertex; // Применяем преобразование
-                currentShape[i] = new Vector2(transformedVertex.X, transformedVertex.Y);
-            }
         }
