@@ -1,9 +1,14 @@
- protected override void OnUpdateFrame(FrameEventArgs args)
+protected override void OnUpdateFrame(FrameEventArgs args)
         {
-            // Обновляем координаты текущих вершин, чтобы перемещать шестиугольник
+            // Создаем матрицу трансляции, которая будет перемещать шестиугольник
+            translationMatrix = Matrix4.CreateTranslation(moveSpeed, 0, 0); // Перемещение вдоль оси X
+
+            // Применяем матрицу к каждой вершине
             for (int i = 0; i < currentShape.Length; i++)
             {
-                currentShape[i] += movementDirection; // Добавляем смещение к каждой вершине
+                Vector4 vertex = new Vector4(currentShape[i].X, currentShape[i].Y, 0, 1);
+                Vector4 transformedVertex = translationMatrix * vertex; // Применяем матрицу трансляции
+                currentShape[i] = new Vector2(transformedVertex.X, transformedVertex.Y);
             }
 
             // Обновляем буфер вершин с новыми координатами
