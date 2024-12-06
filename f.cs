@@ -1,16 +1,13 @@
-public void SetUniform(string name, Matrix3 matrix)
+protected override void OnRenderFrame(FrameEventArgs args)
 {
-    if (!this.GetShaderUniform(name, out ShaderUniform uniform))
-    {
-        throw new ArgumentException("Name was not found.");
-    }
+    GL.Clear(ClearBufferMask.ColorBufferBit);
 
-    if (uniform.Type != ActiveUniformType.FloatMat3)
-    {
-        throw new ArgumentException("Uniform type is not FloatMat3.");
-    }
+    GL.UseProgram(this.shaderProgram.ShaderProgramHandle);
 
-    GL.UseProgram(this.ShaderProgramHandle);
-    GL.UniformMatrix3(uniform.Location, false, ref matrix);
-    GL.UseProgram(0);
+    GL.BindVertexArray(this.vertexArray.VertexArrayHandle);
+    GL.BindBuffer(BufferTarget.ElementArrayBuffer, this.indexBuffer.IndexBufferHandle);
+    GL.DrawElements(PrimitiveType.Triangles, this.indexCount, DrawElementsType.UnsignedInt, 0);
+
+    this.Context.SwapBuffers();
+    base.OnRenderFrame(args);
 }
