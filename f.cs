@@ -19,9 +19,7 @@ namespace CompGraph
 
         private Vector2[] initialShape;
         private Vector2[] currentShape;
-        private Matrix4 translationMatrix;
-
-        private float moveSpeed = 0.1f; // Скорость перемещения
+        private Vector2 movementDirection = new Vector2(0.1f, 0); // Направление перемещения
 
         public Game(int width = 1280, int height = 768, string title = "Game1")
             : base(
@@ -85,7 +83,6 @@ namespace CompGraph
                 @"
                 #version 330 core
 
-                uniform mat4 translationMatrix;
                 uniform vec2 ViewportSize;
                 uniform float ColorFactor;
 
@@ -96,10 +93,10 @@ namespace CompGraph
 
                 void main()
                 {
-                    vec4 transformedPosition = translationMatrix * vec4(aPosition, 0.0, 1.0);
-                    float nx = transformedPosition.x / ViewportSize.x * 2.0 - 1.0;
-                    float ny = transformedPosition.y / ViewportSize.y * 2.0 - 1.0;
-                    gl_Position = vec4(nx, ny, 0.0, 1.0);
+                    float nx = aPosition.x / ViewportSize.x * 2f - 1f;
+                    float ny = aPosition.y / ViewportSize.y * 2f - 1f;
+                    gl_Position = vec4(nx, ny, 0f, 1f);
+
                     vColor = aColor * ColorFactor;
                 }
                 ";
@@ -152,9 +149,20 @@ namespace CompGraph
 
         protected override void OnUpdateFrame(FrameEventArgs args)
         {
-            // Обновляем матрицу трансляции для перемещения шестиугольника
-            translationMatrix = Matrix4.CreateTranslation(new Vector3(moveSpeed, 0, 0));
-            this.shaderProgram.SetUniform("translationMatrix", translationMatrix);
+            // Обновляем координаты текущих вершин, чтобы перемещать шестиугольник
+            for (int i = 0; i < currentShape.Length; i++)
+            {
+                currentShape[i] += movementDirection; // Добавляем смещение к каждой вершине
+            }
+
+            // Обновляем буфер вершин с новыми координатами
+            VertexPositionColor[] vertices = new VertexPositionColor[this.currentShape.Length];
+            for (int i = 0; i < this.currentShape.Length; i++)
+            {
+                vertices[i] = new VertexPositionColor(this.currentShape[i], new Color4(0.2f, 0.4f, 0.8f, 1f));
+            }
+
+            this.vertexBuffer.SetData(vertices, vertices.Length);
 
             base.OnUpdateFrame(args);
         }
