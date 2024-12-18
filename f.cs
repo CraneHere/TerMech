@@ -148,7 +148,6 @@ public class OpenGLWindow : GameWindow
 
     private void InitializePyramid()
     {
-        // Вершины для пирамиды (основная часть)
         float[] vertices = {
             // Base of the pyramid
             -1f, -1f, -1f, 1f, 0f, 0f,
@@ -192,7 +191,7 @@ public class OpenGLWindow : GameWindow
 
     private void InitializeCylinder()
     {
-        // Похожий код для создания цилиндра...
+        // Похожий код для создания цилиндра
     }
 
     private int CreateShaderProgram()
