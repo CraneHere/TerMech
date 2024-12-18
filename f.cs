@@ -1,177 +1,242 @@
-using OpenTK.Windowing.Desktop;
-using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
-using OpenTK.Windowing.Common;
-using OpenTK.Windowing.GraphicsLibraryFramework;
 using System;
+using OpenTK.Windowing.Common;
+using OpenTK.Windowing.Desktop;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
 
-namespace OpenTKScene
+namespace CompGraph
 {
-    public class Program
+    public class Game : GameWindow
     {
-        public static void Main(string[] args)
-        {
-            var settings = new NativeWindowSettings
-            {
-                Size = new Vector2i(800, 600),
-                Title = "3D Scene with Cube, Pyramid, and Cylinder",
-                Flags = ContextFlags.ForwardCompatible
-            };
+        private VertexArray[] vertexArrays;
+        private Shader shaderProgram;
 
-            using (var window = new SceneWindow(GameWindowSettings.Default, settings))
-            {
-                window.Run();
-            }
+        private Matrix4 projectionMatrix;
+        private Matrix4 viewMatrix;
+        private Matrix4[] modelMatrices;
+
+        public Game(int width = 1280, int height = 768, string title = "3D Scene")
+            : base(
+                GameWindowSettings.Default,
+                new NativeWindowSettings()
+                {
+                    Title = title,
+                    Size = new Vector2i(width, height),
+                    WindowBorder = WindowBorder.Fixed,
+                    StartVisible = false,
+                    StartFocused = true,
+                    API = ContextAPI.OpenGL,
+                    Profile = ContextProfile.Core,
+                    APIVersion = new Version(3, 3)
+                })
+        {
+            this.CenterWindow();
         }
-    }
 
-    public class SceneWindow : GameWindow
-    {
-        private Vector3[] lightPositions = new[]
+        protected override void OnResize(ResizeEventArgs e)
         {
-            new Vector3(1.0f, 1.0f, 1.0f),
-            new Vector3(-1.0f, 1.0f, -1.0f)
-        };
-
-        private float anglex = 70.0f;
-        private float angley = 5.0f;
-
-        public SceneWindow(GameWindowSettings gameWindowSettings, NativeWindowSettings nativeWindowSettings)
-            : base(gameWindowSettings, nativeWindowSettings)
-        {
+            GL.Viewport(0, 0, e.Width, e.Height);
+            projectionMatrix = Matrix4.CreatePerspectiveFieldOfView(
+                MathHelper.DegreesToRadians(45f),
+                Size.X / (float)Size.Y,
+                0.1f,
+                100f);
+            base.OnResize(e);
         }
 
         protected override void OnLoad()
         {
-            GL.ClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+            this.IsVisible = true;
+
+            GL.ClearColor(0.2f, 0.3f, 0.3f, 1f);
             GL.Enable(EnableCap.DepthTest);
+
+            string vertexShaderCode = @"
+            #version 330 core
+
+            layout (location = 0) in vec3 aPosition;
+
+            uniform mat4 projection;
+            uniform mat4 view;
+            uniform mat4 model;
+
+            void main()
+            {
+                gl_Position = projection * view * model * vec4(aPosition, 1.0);
+            }";
+
+            string fragmentShaderCode = @"
+            #version 330 core
+
+            out vec4 FragColor;
+
+            void main()
+            {
+                FragColor = vec4(1.0, 0.5, 0.2, 1.0);
+            }";
+
+            shaderProgram = new Shader(vertexShaderCode, fragmentShaderCode);
+
+            // Создание геометрии
+            vertexArrays = new[]
+            {
+                CreateCube(),
+                CreatePyramid(),
+                CreateCylinder(1f, 0.5f, 16)
+            };
+
+            // Матрицы
+            projectionMatrix = Matrix4.CreatePerspectiveFieldOfView(
+                MathHelper.DegreesToRadians(45f),
+                Size.X / (float)Size.Y,
+                0.1f,
+                100f);
+
+            viewMatrix = Matrix4.LookAt(
+                new Vector3(3f, 3f, 3f),
+                Vector3.Zero,
+                Vector3.UnitY);
+
+            modelMatrices = new[]
+            {
+                Matrix4.Identity, // Куб
+                Matrix4.CreateTranslation(2f, 0f, 0f), // Пирамида
+                Matrix4.CreateTranslation(-2f, 0f, 0f) // Цилиндр
+            };
 
             base.OnLoad();
         }
 
-        protected override void OnUpdateFrame(FrameEventArgs args)
+        protected override void OnUnload()
         {
-            if (!IsFocused) return;
+            foreach (var va in vertexArrays)
+            {
+                va.Dispose();
+            }
 
-            // Keyboard controls for camera
-            var keyboardState = KeyboardState;
-            if (keyboardState.IsKeyDown(Keys.Right)) anglex += 1f;
-            if (keyboardState.IsKeyDown(Keys.Left)) anglex -= 1f;
-            if (keyboardState.IsKeyDown(Keys.Up)) angley += 0.5f;
-            if (keyboardState.IsKeyDown(Keys.Down)) angley -= 0.5f;
-
-            // Light movement controls
-            if (keyboardState.IsKeyDown(Keys.W)) lightPositions[0].Y += 0.01f;
-            if (keyboardState.IsKeyDown(Keys.S)) lightPositions[0].Y -= 0.01f;
-            if (keyboardState.IsKeyDown(Keys.A)) lightPositions[0].X -= 0.01f;
-            if (keyboardState.IsKeyDown(Keys.D)) lightPositions[0].X += 0.01f;
-            if (keyboardState.IsKeyDown(Keys.Q)) lightPositions[0].Z -= 0.01f;
-            if (keyboardState.IsKeyDown(Keys.E)) lightPositions[0].Z += 0.01f;
-
-            if (keyboardState.IsKeyDown(Keys.I)) lightPositions[1].Y += 0.01f;
-            if (keyboardState.IsKeyDown(Keys.K)) lightPositions[1].Y -= 0.01f;
-            if (keyboardState.IsKeyDown(Keys.J)) lightPositions[1].X -= 0.01f;
-            if (keyboardState.IsKeyDown(Keys.L)) lightPositions[1].X += 0.01f;
-            if (keyboardState.IsKeyDown(Keys.U)) lightPositions[1].Z -= 0.01f;
-            if (keyboardState.IsKeyDown(Keys.O)) lightPositions[1].Z += 0.01f;
-
-            base.OnUpdateFrame(args);
+            shaderProgram.Dispose();
+            base.OnUnload();
         }
 
         protected override void OnRenderFrame(FrameEventArgs args)
         {
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-            GL.MatrixMode(MatrixMode.Projection);
-            GL.LoadIdentity();
-            Matrix4 perspective = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(45.0f), Size.X / (float)Size.Y, 1.0f, 500.0f);
-            GL.LoadMatrix(ref perspective);
+            shaderProgram.Use();
 
-            GL.MatrixMode(MatrixMode.Modelview);
-            GL.LoadIdentity();
-            Matrix4 lookAt = Matrix4.LookAt(new Vector3(0.0f, angley, 8.0f), Vector3.Zero, Vector3.UnitY);
-            GL.LoadMatrix(ref lookAt);
-            GL.Rotate(anglex, 0.0f, 1.0f, 0.0f);
+            shaderProgram.SetUniform("projection", projectionMatrix);
+            shaderProgram.SetUniform("view", viewMatrix);
 
-            // Draw objects
-            DrawCube(1.0f, new Vector3(-2.0f, 0.0f, 0.0f));
-            DrawPyramid(1.0f, 1.5f, new Vector3(2.0f, 0.0f, 0.0f));
-            DrawCylinder(0.5f, 1.5f, 32, new Vector3(0.0f, 0.0f, -2.0f));
+            foreach (var (vertexArray, modelMatrix) in vertexArrays.Zip(modelMatrices))
+            {
+                shaderProgram.SetUniform("model", modelMatrix);
+                vertexArray.Bind();
+                GL.DrawElements(PrimitiveType.Triangles, vertexArray.IndexCount, DrawElementsType.UnsignedInt, 0);
+            }
 
-            // Draw light sources
-            DrawLightSource(lightPositions[0]);
-            DrawLightSource(lightPositions[1]);
-
-            Context.SwapBuffers();
+            SwapBuffers();
             base.OnRenderFrame(args);
         }
 
-        private void DrawCube(float size, Vector3 position)
+        private VertexArray CreateCube()
         {
-            float halfSize = size / 2.0f;
-
-            GL.PushMatrix();
-            GL.Translate(position);
-
-            GL.Begin(PrimitiveType.Quads);
-            // Front face
-            GL.Color3(0.2f, 0.0f, 0.1f);
-            GL.Vertex3(-halfSize, -halfSize, halfSize);
-            GL.Vertex3(halfSize, -halfSize, halfSize);
-            GL.Vertex3(halfSize, halfSize, halfSize);
-            GL.Vertex3(-halfSize, halfSize, halfSize);
-            // Other faces (similar logic)
-            GL.End();
-
-            GL.PopMatrix();
-        }
-
-        private void DrawPyramid(float size, float height, Vector3 position)
-        {
-            GL.PushMatrix();
-            GL.Translate(position);
-
-            GL.Begin(PrimitiveType.Triangles);
-            // Front face
-            GL.Color3(0.0f, 1.0f, 0.0f);
-            GL.Vertex3(0.0f, height, 0.0f);
-            GL.Vertex3(-size / 2, 0.0f, size / 2);
-            GL.Vertex3(size / 2, 0.0f, size / 2);
-            GL.End();
-
-            GL.PopMatrix();
-        }
-
-        private void DrawCylinder(float radius, float height, int slices, Vector3 position)
-        {
-            float angleStep = 2 * MathF.PI / slices;
-
-            GL.PushMatrix();
-            GL.Translate(position);
-
-            GL.Begin(PrimitiveType.QuadStrip);
-            for (int i = 0; i <= slices; ++i)
+            // Куб: 8 вершин, 12 треугольников
+            float[] vertices =
             {
-                float angle = i * angleStep;
+                // Front face
+                -0.5f, -0.5f,  0.5f,
+                 0.5f, -0.5f,  0.5f,
+                 0.5f,  0.5f,  0.5f,
+                -0.5f,  0.5f,  0.5f,
+                // Back face
+                -0.5f, -0.5f, -0.5f,
+                 0.5f, -0.5f, -0.5f,
+                 0.5f,  0.5f, -0.5f,
+                -0.5f,  0.5f, -0.5f,
+            };
+
+            int[] indices =
+            {
+                // Front
+                0, 1, 2, 0, 2, 3,
+                // Back
+                4, 5, 6, 4, 6, 7,
+                // Left
+                0, 3, 7, 0, 7, 4,
+                // Right
+                1, 2, 6, 1, 6, 5,
+                // Top
+                2, 3, 7, 2, 7, 6,
+                // Bottom
+                0, 1, 5, 0, 5, 4
+            };
+
+            return new VertexArray(vertices, indices);
+        }
+
+        private VertexArray CreatePyramid()
+        {
+            // Пирамида с квадратным основанием
+            float[] vertices =
+            {
+                // Основание
+                -0.5f, 0f,  0.5f,
+                 0.5f, 0f,  0.5f,
+                 0.5f, 0f, -0.5f,
+                -0.5f, 0f, -0.5f,
+                // Вершина
+                 0f,   1f,  0f,
+            };
+
+            int[] indices =
+            {
+                // Основание
+                0, 1, 2, 0, 2, 3,
+                // Стороны
+                0, 1, 4,
+                1, 2, 4,
+                2, 3, 4,
+                3, 0, 4
+            };
+
+            return new VertexArray(vertices, indices);
+        }
+
+        private VertexArray CreateCylinder(float height, float radius, int segments)
+        {
+            // Цилиндр: точки оснований и боковые поверхности
+            var vertices = new List<float>();
+            var indices = new List<int>();
+
+            // Верхнее и нижнее основание
+            for (int i = 0; i <= segments; i++)
+            {
+                float angle = MathHelper.TwoPi / segments * i;
                 float x = radius * MathF.Cos(angle);
                 float z = radius * MathF.Sin(angle);
-                GL.Color3(0.0f, 0.0f, 0.5f);
-                GL.Vertex3(x, 0.0f, z);
-                GL.Vertex3(x, height, z);
+                // Верхняя точка
+                vertices.Add(x);
+                vertices.Add(height / 2);
+                vertices.Add(z);
+                // Нижняя точка
+                vertices.Add(x);
+                vertices.Add(-height / 2);
+                vertices.Add(z);
             }
-            GL.End();
 
-            GL.PopMatrix();
-        }
+            // Индексы
+            for (int i = 0; i < segments; i++)
+            {
+                indices.Add(i * 2);
+                indices.Add((i + 1) * 2);
+                indices.Add(i * 2 + 1);
 
-        private void DrawLightSource(Vector3 position)
-        {
-            GL.PushMatrix();
-            GL.Translate(position);
-            GL.Color3(1.0f, 1.0f, 1.0f);
-            GL.Begin(PrimitiveType.Sphere); // Replace with OpenTK-based sphere drawing.
-            GL.End();
-            GL.PopMatrix();
+                indices.Add(i * 2 + 1);
+                indices.Add((i + 1) * 2);
+                indices.Add((i + 1) * 2 + 1);
+            }
+
+            return new VertexArray(vertices.ToArray(), indices.ToArray());
         }
     }
 }
