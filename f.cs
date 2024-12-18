@@ -48,7 +48,7 @@ class Program
 
                 GL.MatrixMode(MatrixMode.Projection);
                 GL.LoadIdentity();
-                GLU.gluPerspective(45.0f, window.Width / (float)window.Height, 1.0f, 500.0f);
+                SetPerspective(45.0f, window.Width / (float)window.Height, 1.0f, 500.0f);
 
                 GL.MatrixMode(MatrixMode.Modelview);
                 GL.LoadIdentity();
@@ -96,6 +96,36 @@ class Program
         if (Keyboard.GetState().IsKeyDown(Key.L)) lightPositions[1].X += 0.01f;
         if (Keyboard.GetState().IsKeyDown(Key.U)) lightPositions[1].Z -= 0.01f;
         if (Keyboard.GetState().IsKeyDown(Key.O)) lightPositions[1].Z += 0.01f;
+    }
+
+    private static void SetPerspective(float fov, float aspect, float nearPlane, float farPlane)
+    {
+        float f = (float)(1.0 / Math.Tan(fov * Math.PI / 360.0));
+        float range = nearPlane - farPlane;
+
+        float[] matrix = new float[16];
+
+        matrix[0] = f / aspect;
+        matrix[1] = 0.0f;
+        matrix[2] = 0.0f;
+        matrix[3] = 0.0f;
+
+        matrix[4] = 0.0f;
+        matrix[5] = f;
+        matrix[6] = 0.0f;
+        matrix[7] = 0.0f;
+
+        matrix[8] = 0.0f;
+        matrix[9] = 0.0f;
+        matrix[10] = (farPlane + nearPlane) / range;
+        matrix[11] = -1.0f;
+
+        matrix[12] = 0.0f;
+        matrix[13] = 0.0f;
+        matrix[14] = (2.0f * farPlane * nearPlane) / range;
+        matrix[15] = 0.0f;
+
+        GL.MultMatrix(matrix);
     }
 
     private static void DrawCube(float size, Vector3 position)
@@ -254,7 +284,7 @@ class Program
         GL.PushMatrix();
         GL.Translate(position);
         GL.Color3(1.0f, 1.0f, 1.0f);
-        GLUT.glutSolidSphere(0.1f, 10, 10);
+        GLU.glutSolidSphere(0.1f, 10, 10);
         GL.PopMatrix();
     }
 }
