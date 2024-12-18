@@ -41,7 +41,7 @@ public class OpenGLWindow : GameWindow
         // Устанавливаем матрицу проекции
         Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(
             MathHelper.DegreesToRadians(45), // угол обзора
-            Width / (float)Height,            // соотношение сторон
+            ClientSize.X / (float)ClientSize.Y, // соотношение сторон
             0.1f,                            // ближайшая плоскость отсечения
             100f                             // дальняя плоскость отсечения
         );
@@ -61,7 +61,7 @@ public class OpenGLWindow : GameWindow
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
         // Камера
-        Matrix4 modelView = Matrix4.LookAt(new Vector3(0f, 0f, 6f), Vector3.Zero, Vector3.UnitY);
+        Matrix4 modelView = Matrix4.CreateLookAt(new Vector3(0f, 0f, 6f), Vector3.Zero, Vector3.UnitY);
         GL.UniformMatrix4(modelViewMatrixLocation, false, ref modelView);
 
         // Рисуем куб
