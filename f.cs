@@ -8,26 +8,35 @@ using System.Numerics;
 public class OpenGLWindow : GameWindow
 {
     private float rotation = 0f;
-    
-    public OpenGLWindow() : base(GameWindowSettings.Default, NativeWindowSettings.Default)
+
+    public OpenGLWindow() : base(GameWindowSettings.Default, new NativeWindowSettings { Size = new OpenTK.Mathematics.Vector2i(800, 600), Title = "3D Scene with Lighting" })
     {
     }
 
     protected override void OnLoad()
     {
         base.OnLoad();
-        
+
         // Инициализация OpenGL
         GL.ClearColor(0.39f, 0.58f, 0.93f, 1.0f);  // Цвет фона (cornflower blue)
         GL.Enable(EnableCap.DepthTest);  // Включаем тест глубины
+    }
+
+    protected override void OnResize(ResizeEventArgs e)
+    {
+        base.OnResize(e);
+
+        // Обновляем размер окна
+        GL.Viewport(0, 0, e.Width, e.Height);
 
         // Настройка перспективной проекции
-        Matrix4x4 projection = Matrix4x4.CreatePerspectiveFieldOfView(
+        Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(
             MathHelper.DegreesToRadians(45), // угол обзора
             Width / (float)Height,            // соотношение сторон
             0.1f,                            // ближайшая плоскость отсечения
             100f                             // дальняя плоскость отсечения
         );
+
         GL.MatrixMode(MatrixMode.Projection);
         GL.LoadMatrix(ref projection);
     }
