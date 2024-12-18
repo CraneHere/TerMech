@@ -1,242 +1,249 @@
-using System;
-using OpenTK.Windowing.Common;
-using OpenTK.Windowing.Desktop;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
+using System;
 
 namespace CompGraph
 {
-    public class Game : GameWindow
+    public sealed class Shader : IDisposable
     {
-        private VertexArray[] vertexArrays;
-        private Shader shaderProgram;
+        private bool disposed;
 
-        private Matrix4 projectionMatrix;
-        private Matrix4 viewMatrix;
-        private Matrix4[] modelMatrices;
+        public readonly int ShaderProgramHandle;
+        public readonly int VertexShaderHandle;
+        public readonly int PixelShaderHandle;
 
-        public Game(int width = 1280, int height = 768, string title = "3D Scene")
-            : base(
-                GameWindowSettings.Default,
-                new NativeWindowSettings()
+        private readonly ShaderUniform[] uniforms;
+        private readonly ShaderAttribute[] attributes;
+
+        public Shader(string vertexShaderCode, string pixelShaderCode)
+        {
+            this.disposed = false;
+
+            if (!Shader.CompileVertexShader(vertexShaderCode, out this.VertexShaderHandle, out string vertexShaderCompileError))
+            {
+                throw new ArgumentException(vertexShaderCompileError);
+            }
+
+            if (!Shader.CompilePixelShader(pixelShaderCode, out this.PixelShaderHandle, out string pixelShaderCompileError))
+            {
+                throw new ArgumentException(pixelShaderCompileError);
+            }
+
+            this.ShaderProgramHandle = Shader.CreateLinkProgram(this.VertexShaderHandle, this.PixelShaderHandle);
+
+            this.uniforms = Shader.CreateUniformList(this.ShaderProgramHandle);
+            this.attributes = Shader.CreateAttributeList(this.ShaderProgramHandle);
+        }
+
+        ~Shader()
+        {
+            this.Dispose();
+        }
+
+        public void Dispose()
+        {
+            if (this.disposed)
+            {
+                return;
+            }
+
+            GL.DeleteShader(this.VertexShaderHandle);
+            GL.DeleteShader(this.PixelShaderHandle);
+
+            GL.UseProgram(0);
+            GL.DeleteProgram(this.ShaderProgramHandle);
+
+            this.disposed = true;
+            GC.SuppressFinalize(this);
+        }
+
+        public ShaderUniform[] GetUniformList()
+        {
+            ShaderUniform[] result = new ShaderUniform[this.uniforms.Length];
+            Array.Copy(this.uniforms, result, this.uniforms.Length);
+            return result;
+        }
+
+        public ShaderAttribute[] GetAttributeList()
+        {
+            ShaderAttribute[] result = new ShaderAttribute[this.attributes.Length];
+            Array.Copy(this.attributes, result, this.attributes.Length);
+            return result;
+        }
+
+        public void Use()
+        {
+            GL.UseProgram(this.ShaderProgramHandle);
+        }
+
+        // Добавляем SetUniform для различных типов данных
+
+        public void SetUniform(string name, float v1)
+        {
+            if (!this.GetShaderUniform(name, out ShaderUniform uniform))
+            {
+                throw new ArgumentException("Name was not found.");
+            }
+
+            if (uniform.Type != ActiveUniformType.Float)
+            {
+                throw new ArgumentException("Uniform type is not float.");
+            }
+
+            GL.UseProgram(this.ShaderProgramHandle);
+            GL.Uniform1(uniform.Location, v1);
+            GL.UseProgram(0);
+        }
+
+        public void SetUniform(string name, int v1)
+        {
+            if (!this.GetShaderUniform(name, out ShaderUniform uniform))
+            {
+                throw new ArgumentException("Name was not found.");
+            }
+
+            if (uniform.Type != ActiveUniformType.Int)
+            {
+                throw new ArgumentException("Uniform type is not int.");
+            }
+
+            GL.UseProgram(this.ShaderProgramHandle);
+            GL.Uniform1(uniform.Location, v1);
+            GL.UseProgram(0);
+        }
+
+        public void SetUniform(string name, float v1, float v2)
+        {
+            if (!this.GetShaderUniform(name, out ShaderUniform uniform))
+            {
+                throw new ArgumentException("Name was not found.");
+            }
+
+            if (uniform.Type != ActiveUniformType.FloatVec2)
+            {
+                throw new ArgumentException("Uniform type is not FloatVec2.");
+            }
+
+            GL.UseProgram(this.ShaderProgramHandle);
+            GL.Uniform2(uniform.Location, v1, v2);
+            GL.UseProgram(0);
+        }
+
+        public void SetUniform(string name, Matrix4 matrix)
+        {
+            if (!this.GetShaderUniform(name, out ShaderUniform uniform))
+            {
+                throw new ArgumentException("Name was not found.");
+            }
+
+            if (uniform.Type != ActiveUniformType.FloatMat4)
+            {
+                throw new ArgumentException("Uniform type is not FloatMat4.");
+            }
+
+            GL.UseProgram(this.ShaderProgramHandle);
+            GL.UniformMatrix4(uniform.Location, false, ref matrix);
+            GL.UseProgram(0);
+        }
+
+        private bool GetShaderUniform(string name, out ShaderUniform uniform)
+        {
+            uniform = new ShaderUniform();
+
+            for (int i = 0; i < this.uniforms.Length; i++)
+            {
+                uniform = this.uniforms[i];
+
+                if (name == uniform.Name)
                 {
-                    Title = title,
-                    Size = new Vector2i(width, height),
-                    WindowBorder = WindowBorder.Fixed,
-                    StartVisible = false,
-                    StartFocused = true,
-                    API = ContextAPI.OpenGL,
-                    Profile = ContextProfile.Core,
-                    APIVersion = new Version(3, 3)
-                })
-        {
-            this.CenterWindow();
-        }
-
-        protected override void OnResize(ResizeEventArgs e)
-        {
-            GL.Viewport(0, 0, e.Width, e.Height);
-            projectionMatrix = Matrix4.CreatePerspectiveFieldOfView(
-                MathHelper.DegreesToRadians(45f),
-                Size.X / (float)Size.Y,
-                0.1f,
-                100f);
-            base.OnResize(e);
-        }
-
-        protected override void OnLoad()
-        {
-            this.IsVisible = true;
-
-            GL.ClearColor(0.2f, 0.3f, 0.3f, 1f);
-            GL.Enable(EnableCap.DepthTest);
-
-            string vertexShaderCode = @"
-            #version 330 core
-
-            layout (location = 0) in vec3 aPosition;
-
-            uniform mat4 projection;
-            uniform mat4 view;
-            uniform mat4 model;
-
-            void main()
-            {
-                gl_Position = projection * view * model * vec4(aPosition, 1.0);
-            }";
-
-            string fragmentShaderCode = @"
-            #version 330 core
-
-            out vec4 FragColor;
-
-            void main()
-            {
-                FragColor = vec4(1.0, 0.5, 0.2, 1.0);
-            }";
-
-            shaderProgram = new Shader(vertexShaderCode, fragmentShaderCode);
-
-            // Создание геометрии
-            vertexArrays = new[]
-            {
-                CreateCube(),
-                CreatePyramid(),
-                CreateCylinder(1f, 0.5f, 16)
-            };
-
-            // Матрицы
-            projectionMatrix = Matrix4.CreatePerspectiveFieldOfView(
-                MathHelper.DegreesToRadians(45f),
-                Size.X / (float)Size.Y,
-                0.1f,
-                100f);
-
-            viewMatrix = Matrix4.LookAt(
-                new Vector3(3f, 3f, 3f),
-                Vector3.Zero,
-                Vector3.UnitY);
-
-            modelMatrices = new[]
-            {
-                Matrix4.Identity, // Куб
-                Matrix4.CreateTranslation(2f, 0f, 0f), // Пирамида
-                Matrix4.CreateTranslation(-2f, 0f, 0f) // Цилиндр
-            };
-
-            base.OnLoad();
-        }
-
-        protected override void OnUnload()
-        {
-            foreach (var va in vertexArrays)
-            {
-                va.Dispose();
+                    return true;
+                }
             }
 
-            shaderProgram.Dispose();
-            base.OnUnload();
+            return false;
         }
 
-        protected override void OnRenderFrame(FrameEventArgs args)
+        public static bool CompileVertexShader(string vertexShaderCode, out int vertexShaderHandle, out string errorMessage)
         {
-            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+            errorMessage = string.Empty;
 
-            shaderProgram.Use();
+            vertexShaderHandle = GL.CreateShader(ShaderType.VertexShader);
+            GL.ShaderSource(vertexShaderHandle, vertexShaderCode);
+            GL.CompileShader(vertexShaderHandle);
 
-            shaderProgram.SetUniform("projection", projectionMatrix);
-            shaderProgram.SetUniform("view", viewMatrix);
-
-            foreach (var (vertexArray, modelMatrix) in vertexArrays.Zip(modelMatrices))
+            string vertexShaderInfo = GL.GetShaderInfoLog(vertexShaderHandle);
+            if (vertexShaderInfo != String.Empty)
             {
-                shaderProgram.SetUniform("model", modelMatrix);
-                vertexArray.Bind();
-                GL.DrawElements(PrimitiveType.Triangles, vertexArray.IndexCount, DrawElementsType.UnsignedInt, 0);
+                errorMessage = vertexShaderInfo;
+                return false;
             }
 
-            SwapBuffers();
-            base.OnRenderFrame(args);
+            return true;
         }
 
-        private VertexArray CreateCube()
+        public static bool CompilePixelShader(string pixelShaderCode, out int pixelShaderHandle, out string errorMessage)
         {
-            // Куб: 8 вершин, 12 треугольников
-            float[] vertices =
+            errorMessage = string.Empty;
+
+            pixelShaderHandle = GL.CreateShader(ShaderType.FragmentShader);
+            GL.ShaderSource(pixelShaderHandle, pixelShaderCode);
+            GL.CompileShader(pixelShaderHandle);
+
+            string pixelShaderInfo = GL.GetShaderInfoLog(pixelShaderHandle);
+            if (pixelShaderInfo != String.Empty)
             {
-                // Front face
-                -0.5f, -0.5f,  0.5f,
-                 0.5f, -0.5f,  0.5f,
-                 0.5f,  0.5f,  0.5f,
-                -0.5f,  0.5f,  0.5f,
-                // Back face
-                -0.5f, -0.5f, -0.5f,
-                 0.5f, -0.5f, -0.5f,
-                 0.5f,  0.5f, -0.5f,
-                -0.5f,  0.5f, -0.5f,
-            };
-
-            int[] indices =
-            {
-                // Front
-                0, 1, 2, 0, 2, 3,
-                // Back
-                4, 5, 6, 4, 6, 7,
-                // Left
-                0, 3, 7, 0, 7, 4,
-                // Right
-                1, 2, 6, 1, 6, 5,
-                // Top
-                2, 3, 7, 2, 7, 6,
-                // Bottom
-                0, 1, 5, 0, 5, 4
-            };
-
-            return new VertexArray(vertices, indices);
-        }
-
-        private VertexArray CreatePyramid()
-        {
-            // Пирамида с квадратным основанием
-            float[] vertices =
-            {
-                // Основание
-                -0.5f, 0f,  0.5f,
-                 0.5f, 0f,  0.5f,
-                 0.5f, 0f, -0.5f,
-                -0.5f, 0f, -0.5f,
-                // Вершина
-                 0f,   1f,  0f,
-            };
-
-            int[] indices =
-            {
-                // Основание
-                0, 1, 2, 0, 2, 3,
-                // Стороны
-                0, 1, 4,
-                1, 2, 4,
-                2, 3, 4,
-                3, 0, 4
-            };
-
-            return new VertexArray(vertices, indices);
-        }
-
-        private VertexArray CreateCylinder(float height, float radius, int segments)
-        {
-            // Цилиндр: точки оснований и боковые поверхности
-            var vertices = new List<float>();
-            var indices = new List<int>();
-
-            // Верхнее и нижнее основание
-            for (int i = 0; i <= segments; i++)
-            {
-                float angle = MathHelper.TwoPi / segments * i;
-                float x = radius * MathF.Cos(angle);
-                float z = radius * MathF.Sin(angle);
-                // Верхняя точка
-                vertices.Add(x);
-                vertices.Add(height / 2);
-                vertices.Add(z);
-                // Нижняя точка
-                vertices.Add(x);
-                vertices.Add(-height / 2);
-                vertices.Add(z);
+                errorMessage = pixelShaderInfo;
+                return false;
             }
 
-            // Индексы
-            for (int i = 0; i < segments; i++)
-            {
-                indices.Add(i * 2);
-                indices.Add((i + 1) * 2);
-                indices.Add(i * 2 + 1);
+            return true;
+        }
 
-                indices.Add(i * 2 + 1);
-                indices.Add((i + 1) * 2);
-                indices.Add((i + 1) * 2 + 1);
+        public static int CreateLinkProgram(int vertexShaderHandle, int pixelShaderHandle)
+        {
+            int shaderProgramHandle = GL.CreateProgram();
+
+            GL.AttachShader(shaderProgramHandle, vertexShaderHandle);
+            GL.AttachShader(shaderProgramHandle, pixelShaderHandle);
+
+            GL.LinkProgram(shaderProgramHandle);
+
+            GL.DetachShader(shaderProgramHandle, vertexShaderHandle);
+            GL.DetachShader(shaderProgramHandle, pixelShaderHandle);
+
+            return shaderProgramHandle;
+        }
+
+        public static ShaderUniform[] CreateUniformList(int shaderProgramHandle)
+        {
+            GL.GetProgram(shaderProgramHandle, GetProgramParameterName.ActiveUniforms, out int uniformCount);
+
+            ShaderUniform[] uniforms = new ShaderUniform[uniformCount];
+
+            for (int i = 0; i < uniformCount; i++)
+            {
+                GL.GetActiveUniform(shaderProgramHandle, i, 256, out _, out _, out ActiveUniformType type, out string name);
+                int location = GL.GetUniformLocation(shaderProgramHandle, name);
+                uniforms[i] = new ShaderUniform(name, location, type);
             }
 
-            return new VertexArray(vertices.ToArray(), indices.ToArray());
+            return uniforms;
+        }
+
+        public static ShaderAttribute[] CreateAttributeList(int shaderProgramHandle)
+        {
+            GL.GetProgram(shaderProgramHandle, GetProgramParameterName.ActiveAttributes, out int attributeCount);
+
+            ShaderAttribute[] attributes = new ShaderAttribute[attributeCount];
+
+            for (int i = 0; i < attributeCount; i++)
+            {
+                GL.GetActiveAttrib(shaderProgramHandle, i, 256, out _, out _, out ActiveAttribType type, out string name);
+                int location = GL.GetAttribLocation(shaderProgramHandle, name);
+                attributes[i] = new ShaderAttribute(name, location, type);
+            }
+
+            return attributes;
         }
     }
 }
