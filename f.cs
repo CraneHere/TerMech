@@ -1,259 +1,239 @@
-using OpenTK;
-using OpenTK.Graphics.OpenGL4;
-using OpenTK.Windowing.Common;
-using OpenTK.Windowing.Desktop;
-using System;
-using System.Numerics;
+// g++ lr2.cpp -lGL -lGLEW -lGLU -lsfml-window -lsfml-system -lsfml-graphics -lglut
+#include <SFML/Graphics.hpp>
+#include <SFML/OpenGL.hpp>
+#include <GL/glu.h>
+#include <GL/gl.h>
+#include <GL/glut.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <cmath>
 
-public class OpenGLWindow : GameWindow
-{
-    private float rotation = 0f;
-    private int shaderProgram;
-    private int vaoCube, vaoPyramid, vaoCylinder;
-    private int vboCube, vboPyramid, vboCylinder;
-    private int projectionMatrixLocation, modelViewMatrixLocation;
+void drawCube(float size) {
+    float halfSize = size / 2.0f;
 
-    public OpenGLWindow() : base(GameWindowSettings.Default, new NativeWindowSettings { Size = new OpenTK.Mathematics.Vector2i(800, 600), Title = "3D Scene with Objects" })
-    {
+    float cube_shift_x = 3;
+
+    glBegin(GL_QUADS);
+    // Front face
+    glColor3f(0.2f, 0.0f, 0.1f);
+    glVertex3f(cube_shift_x + -halfSize, -halfSize,  halfSize);
+    glVertex3f(cube_shift_x + halfSize, -halfSize,  halfSize);
+    glVertex3f(cube_shift_x + halfSize,  halfSize,  halfSize);
+    glVertex3f(cube_shift_x + -halfSize,  halfSize,  halfSize);
+    // Back face
+    glColor3f(0.3f, 0.0f, 0.0f);
+    glVertex3f(cube_shift_x + -halfSize, -halfSize, -halfSize);
+    glVertex3f(cube_shift_x + -halfSize,  halfSize, -halfSize);
+    glVertex3f(cube_shift_x + halfSize,  halfSize, -halfSize);
+    glVertex3f(cube_shift_x + halfSize, -halfSize, -halfSize);
+    // Top face
+    glColor3f(0.5f, 0.0f, 0.0f);
+    glVertex3f(cube_shift_x +-halfSize,  halfSize, -halfSize);
+    glVertex3f(cube_shift_x +-halfSize,  halfSize,  halfSize);
+    glVertex3f(cube_shift_x + halfSize,  halfSize,  halfSize);
+    glVertex3f(cube_shift_x + halfSize,  halfSize, -halfSize);
+    // Bottom face
+    glColor3f(0.7f, 0.0f, 0.0f);
+    glVertex3f(cube_shift_x + -halfSize, -halfSize, -halfSize);
+    glVertex3f(cube_shift_x + halfSize, -halfSize, -halfSize);
+    glVertex3f(cube_shift_x + halfSize, -halfSize,  halfSize);
+    glVertex3f(cube_shift_x + -halfSize, -halfSize,  halfSize);
+    // Right face
+    glColor3f(0.7f, 0.3f, 0.3f);
+    glVertex3f(cube_shift_x + halfSize, -halfSize, -halfSize);
+    glVertex3f(cube_shift_x + halfSize,  halfSize, -halfSize);
+    glVertex3f(cube_shift_x + halfSize,  halfSize,  halfSize);
+    glVertex3f(cube_shift_x + halfSize, -halfSize,  halfSize);
+    // Left face
+    glColor3f(0.7f, 0.5f, 0.5f);
+    glVertex3f(cube_shift_x + -halfSize, -halfSize, -halfSize);
+    glVertex3f(cube_shift_x + -halfSize, -halfSize,  halfSize);
+    glVertex3f(cube_shift_x + -halfSize,  halfSize,  halfSize);
+    glVertex3f(cube_shift_x + -halfSize,  halfSize, -halfSize);
+    glEnd();
+}
+
+void drawPyramid(float size, float height) {
+    float halfSize = size / 2.0f;
+
+    float pyramid_shift_x = 2;
+
+    glBegin(GL_TRIANGLES);
+    // Front face
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glVertex3f(pyramid_shift_x + 0.0f, height, 0.0f);
+    glVertex3f(pyramid_shift_x + -halfSize, 0.0f, halfSize);
+    glVertex3f(pyramid_shift_x + halfSize, 0.0f, halfSize);
+    // Right face
+    glColor3f(0.0f, 0.7f, 0.0f);
+    glVertex3f(pyramid_shift_x + 0.0f, height, 0.0f);
+    glVertex3f(pyramid_shift_x + halfSize, 0.0f, halfSize);
+    glVertex3f(pyramid_shift_x + halfSize, 0.0f, -halfSize);
+    // Back face
+    glColor3f(0.0f, 0.5f, 0.0f);
+    glVertex3f(pyramid_shift_x + 0.0f, height, 0.0f);
+    glVertex3f(pyramid_shift_x + halfSize, 0.0f, -halfSize);
+    glVertex3f(pyramid_shift_x + -halfSize, 0.0f, -halfSize);
+    // Left face
+    glColor3f(0.0f, 0.3f, 0.0f);
+    glVertex3f(pyramid_shift_x + 0.0f, height, 0.0f);
+    glVertex3f(pyramid_shift_x + -halfSize, 0.0f, -halfSize);
+    glVertex3f(pyramid_shift_x + -halfSize, 0.0f, halfSize);
+    glEnd();
+
+    glBegin(GL_QUADS);
+    // Base
+    glColor3f(1.0f, 1.0f, 0.0f);
+    glVertex3f(pyramid_shift_x + -halfSize, 0.0f, halfSize);
+    glVertex3f(pyramid_shift_x + halfSize, 0.0f, halfSize);
+    glVertex3f(pyramid_shift_x + halfSize, 0.0f, -halfSize);
+    glVertex3f(pyramid_shift_x + -halfSize, 0.0f, -halfSize);
+    glEnd();
+}
+
+void drawCylinder(float radius, float height, int slices) {
+    float angleStep = 2 * M_PI / slices;
+
+    float cylinder_shift_x = 2;
+
+    glBegin(GL_QUAD_STRIP);
+    for (int i = 0; i <= slices; ++i) {
+        float angle = i * angleStep;
+        float x = radius * cos(angle);
+        float z = radius * sin(angle);
+        glColor3f(0.0f, 0.0f, 0.5f);
+        glVertex3f(cylinder_shift_x + x, 0.0f, z);
+        glColor3f(0.5f, 0.0f, 0.0f);
+        glVertex3f(cylinder_shift_x + x, height, z);
     }
+    glEnd();
 
-    protected override void OnLoad()
-    {
-        base.OnLoad();
-
-        // Инициализация OpenGL
-        GL.ClearColor(0.39f, 0.58f, 0.93f, 1.0f);  // Цвет фона (cornflower blue)
-        GL.Enable(EnableCap.DepthTest);  // Включаем тест глубины
-
-        // Создание шейдерной программы
-        shaderProgram = CreateShaderProgram();
-        GL.UseProgram(shaderProgram);
-
-        // Инициализация объектов
-        InitializeCube();
-        InitializePyramid();
-        InitializeCylinder();
-
-        // Матрица проекции
-        projectionMatrixLocation = GL.GetUniformLocation(shaderProgram, "projection");
-        modelViewMatrixLocation = GL.GetUniformLocation(shaderProgram, "modelView");
-
-        // Устанавливаем матрицу проекции
-        Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(
-            MathHelper.DegreesToRadians(45), // угол обзора
-            ClientSize.X / (float)ClientSize.Y, // соотношение сторон
-            0.1f,                            // ближайшая плоскость отсечения
-            100f                             // дальняя плоскость отсечения
-        );
-        GL.UniformMatrix4(projectionMatrixLocation, false, ref projection);
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(cylinder_shift_x + 0.0f, 0.0f, 0.0f);
+    for (int i = 0; i <= slices; ++i) {
+        float angle = i * angleStep;
+        float x = radius * cos(angle);
+        float z = radius * sin(angle);
+        glColor3f(0.0f, 0.0f, 1.0f);
+        glVertex3f(cylinder_shift_x + x,0.0f, z);
     }
+    glEnd();
 
-    protected override void OnResize(ResizeEventArgs e)
-    {
-        base.OnResize(e);
-        GL.Viewport(0, 0, e.Width, e.Height);
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(cylinder_shift_x + 0.0f, height, 0.0f);
+    for (int i = 0; i <= slices; ++i) {
+        float angle = i * angleStep;
+        float x = radius * cos(angle);
+        float z = radius * sin(angle);
+        glColor3f(0.0f, 0.0f, 1.0f);
+        glVertex3f(cylinder_shift_x + x, height, z);
     }
+    glEnd();
+}
 
-    protected override void OnRenderFrame(FrameEventArgs args)
-    {
-        base.OnRenderFrame(args);
+void drawLightSource(const glm::vec3& position) {
+    glPushMatrix();
+    glTranslatef(position.x, position.y, position.z);
+    glutSolidSphere(0.1, 10, 10); // Отрисовка источника света как сфера
+    glPopMatrix();
+}
 
-        GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+int main(int argc, char* argv[]) {
+    
+    sf::ContextSettings settings;
+    settings.depthBits = 24;
+    settings.stencilBits = 8;
+    settings.antialiasingLevel = 4;
+    settings.majorVersion = 3;
+    settings.minorVersion = 0;
 
-        // Камера
-        Matrix4 modelView = Matrix4.CreateLookAt(new Vector3(0f, 0f, 6f), Vector3.Zero, Vector3.UnitY);
-        GL.UniformMatrix4(modelViewMatrixLocation, false, ref modelView);
+    glutInit(&argc,argv);
 
-        // Рисуем куб
-        GL.BindVertexArray(vaoCube);
-        Matrix4 modelCube = Matrix4.CreateRotationY(rotation);
-        GL.UniformMatrix4(modelViewMatrixLocation, false, ref modelCube);
-        GL.DrawArrays(PrimitiveType.Quads, 0, 24);
+    sf::RenderWindow window(sf::VideoMode(800, 600), "3D Scene with Cube, Pyramid, and Cylinder", sf::Style::Default, settings);
+    window.setFramerateLimit(60);
 
-        // Рисуем пирамиду
-        GL.BindVertexArray(vaoPyramid);
-        Matrix4 modelPyramid = Matrix4.CreateTranslation(-2f, 0f, 0f) * Matrix4.CreateRotationY(rotation);
-        GL.UniformMatrix4(modelViewMatrixLocation, false, ref modelPyramid);
-        GL.DrawArrays(PrimitiveType.Triangles, 0, 12);
+    glm::vec3 lightPositions[] = {
+        {1.0f, 1.0f, 1.0f},
+        {-1.0f, 1.0f, -1.0f}
+    };
 
-        // Рисуем цилиндр
-        GL.BindVertexArray(vaoCylinder);
-        Matrix4 modelCylinder = Matrix4.CreateTranslation(2f, 0f, 0f) * Matrix4.CreateRotationY(rotation);
-        GL.UniformMatrix4(modelViewMatrixLocation, false, ref modelCylinder);
-        GL.DrawArrays(PrimitiveType.TriangleStrip, 0, 144);
+    glEnable(GL_DEPTH_TEST);
 
-        // Обновление экрана
-        SwapBuffers();
+    float anglex = 70.0f;
+    float angley = 5.0f;
 
-        rotation += 0.5f;
-    }
+    while (window.isOpen()) {
+        sf::Event event;
+        while (window.pollEvent(event)) {
 
-    private void InitializeCube()
-    {
-        float[] vertices = {
-            // Front face
-            -1f, -1f, 1f, 1f, 0f, 0f,
-            1f, -1f, 1f, 1f, 0f, 0f,
-            1f, 1f, 1f, 1f, 0f, 0f,
-            -1f, 1f, 1f, 1f, 0f, 0f,
-
-            // Back face
-            -1f, -1f, -1f, 0f, 1f, 0f,
-            -1f, 1f, -1f, 0f, 1f, 0f,
-            1f, 1f, -1f, 0f, 1f, 0f,
-            1f, -1f, -1f, 0f, 1f, 0f,
-
-            // Left face
-            -1f, -1f, 1f, 0f, 0f, 1f,
-            -1f, -1f, -1f, 0f, 0f, 1f,
-            -1f, 1f, -1f, 0f, 0f, 1f,
-            -1f, 1f, 1f, 0f, 0f, 1f,
-
-            // Right face
-            1f, -1f, 1f, 1f, 1f, 0f,
-            1f, 1f, 1f, 1f, 1f, 0f,
-            1f, 1f, -1f, 1f, 1f, 0f,
-            1f, -1f, -1f, 1f, 1f, 0f,
-
-            // Top face
-            -1f, 1f, 1f, 1f, 1f, 0f,
-            1f, 1f, 1f, 1f, 1f, 0f,
-            1f, 1f, -1f, 1f, 1f, 0f,
-            -1f, 1f, -1f, 1f, 1f, 0f,
-
-            // Bottom face
-            -1f, -1f, 1f, 0f, 1f, 1f,
-            -1f, -1f, -1f, 0f, 1f, 1f,
-            1f, -1f, -1f, 0f, 1f, 1f,
-            1f, -1f, 1f, 0f, 1f, 1f
-        };
-
-        // Вершины для куба
-        vaoCube = GL.GenVertexArray();
-        vboCube = GL.GenBuffer();
-        GL.BindVertexArray(vaoCube);
-        GL.BindBuffer(BufferTarget.ArrayBuffer, vboCube);
-        GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
-
-        // Связываем атрибуты вершин
-        GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
-        GL.EnableVertexAttribArray(0);
-
-        GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
-        GL.EnableVertexAttribArray(1);
-
-        GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
-        GL.BindVertexArray(0);
-    }
-
-    private void InitializePyramid()
-    {
-        float[] vertices = {
-            // Base of the pyramid
-            -1f, -1f, -1f, 1f, 0f, 0f,
-            1f, -1f, -1f, 1f, 0f, 0f,
-            1f, -1f, 1f, 1f, 0f, 0f,
-            -1f, -1f, 1f, 1f, 0f, 0f,
-
-            // Side triangles
-            0f, 1f, 0f, 0f, 1f, 0f,
-            -1f, -1f, -1f, 0f, 1f, 0f,
-            1f, -1f, -1f, 0f, 1f, 0f,
-
-            0f, 1f, 0f, 0f, 1f, 0f,
-            1f, -1f, -1f, 0f, 1f, 0f,
-            1f, -1f, 1f, 0f, 1f, 0f,
-
-            0f, 1f, 0f, 0f, 1f, 0f,
-            1f, -1f, 1f, 0f, 1f, 0f,
-            -1f, -1f, 1f, 0f, 1f, 0f,
-
-            0f, 1f, 0f, 0f, 1f, 0f,
-            -1f, -1f, 1f, 0f, 1f, 0f,
-            -1f, -1f, -1f, 0f, 1f, 0f
-        };
-
-        vaoPyramid = GL.GenVertexArray();
-        vboPyramid = GL.GenBuffer();
-        GL.BindVertexArray(vaoPyramid);
-        GL.BindBuffer(BufferTarget.ArrayBuffer, vboPyramid);
-        GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
-
-        GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
-        GL.EnableVertexAttribArray(0);
-
-        GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
-        GL.EnableVertexAttribArray(1);
-
-        GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
-        GL.BindVertexArray(0);
-    }
-
-    private void InitializeCylinder()
-    {
-        // Похожий код для создания цилиндра
-    }
-
-    private int CreateShaderProgram()
-    {
-        string vertexShaderSource = @"
-            #version 330 core
-            layout(location = 0) in vec3 position;
-            layout(location = 1) in vec3 color;
-            out vec3 fragColor;
-            uniform mat4 modelView;
-            uniform mat4 projection;
-            void main()
-            {
-                gl_Position = projection * modelView * vec4(position, 1.0);
-                fragColor = color;
-            }
-        ";
-
-        string fragmentShaderSource = @"
-            #version 330 core
-            in vec3 fragColor;
-            out vec4 color;
-            void main()
-            {
-                color = vec4(fragColor, 1.0);
-            }
-        ";
-
-        int vertexShader = CompileShader(ShaderType.VertexShader, vertexShaderSource);
-        int fragmentShader = CompileShader(ShaderType.FragmentShader, fragmentShaderSource);
-
-        int program = GL.CreateProgram();
-        GL.AttachShader(program, vertexShader);
-        GL.AttachShader(program, fragmentShader);
-        GL.LinkProgram(program);
-
-        GL.DetachShader(program, vertexShader);
-        GL.DetachShader(program, fragmentShader);
-        GL.DeleteShader(vertexShader);
-        GL.DeleteShader(fragmentShader);
-
-        return program;
-    }
-
-    private int CompileShader(ShaderType type, string source)
-    {
-        int shader = GL.CreateShader(type);
-        GL.ShaderSource(shader, source);
-        GL.CompileShader(shader);
-        GL.GetShaderInfoLog(shader, out string infoLog);
-        if (!string.IsNullOrEmpty(infoLog))
-        {
-            Console.WriteLine($"Shader Compile Error: {infoLog}");
+            if (event.type == sf::Event::Closed)
+                window.close();
         }
-        return shader;
+
+        // Обработка клавиатуры для перемещения угла обзора
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) anglex += 1.f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) anglex -= 1.f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) angley += 0.5f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) angley -= 0.5f;
+
+        // Обработка клавиатуры для перемещения источников света
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) lightPositions[0].y += 0.01f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) lightPositions[0].y -= 0.01f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) lightPositions[0].x -= 0.01f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) lightPositions[0].x += 0.01f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Q)) lightPositions[0].z -= 0.01f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::E)) lightPositions[0].z += 0.01f;
+
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::I)) lightPositions[1].y += 0.01f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::K)) lightPositions[1].y -= 0.01f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::J)) lightPositions[1].x -= 0.01f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::L)) lightPositions[1].x += 0.01f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::U)) lightPositions[1].z -= 0.01f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::O)) lightPositions[1].z += 0.01f;
+
+        
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        gluPerspective(45.0f, window.getSize().x / window.getSize().y, 1.0f, 500.0f);
+
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+        //gluLookAt(0.0f, 0.0f, 8.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+        gluLookAt(0.0f, angley, 8.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.1f, 0.0f);
+
+        glRotatef(anglex, 0.0f, 1.0f, 0.0f);
+
+        // Draw Cube
+        glPushMatrix();
+        glTranslatef(-2.0f, 0.0f, 0.0f);
+        //glColor3f(1.0f, 0.0f, 0.0f);
+        drawCube(1.0f);
+        glPopMatrix();
+
+        // Draw Pyramid
+        glPushMatrix();
+        glTranslatef(2.0f, 0.0f, 0.0f);
+        //glColor3f(0.0f, 1.0f, 0.0f);
+        drawPyramid(1.0f, 1.5f);
+        glPopMatrix();
+
+        // Draw Cylinder
+        glPushMatrix();
+        glTranslatef(0.0f, 0.0f, -2.0f);
+        //glColor3f(0.0f, 0.0f, 1.0f);
+        drawCylinder(0.5f, 1.5f, 32);
+        glPopMatrix();
+
+        // Draw light sources
+        glColor3f(1.0f, 1.0f, 1.0f);
+        drawLightSource(lightPositions[0]);
+        drawLightSource(lightPositions[1]);
+
+        window.display();
     }
 
-    public static void Main()
-    {
-        using (var window = new OpenGLWindow())
-        {
-            window.Run();
-        }
-    }
+    return 0;
 }
