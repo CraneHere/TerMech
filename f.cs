@@ -9,15 +9,11 @@ public class OpenGLWindow : GameWindow
 {
     private float rotation = 0f;
     private int shaderProgram;
-    private int vaoCube, vaoPyramid, vaoCylinder, vaoLight;
-    private int vboCube, vboPyramid, vboCylinder, vboLight;
+    private int vaoCube, vaoPyramid, vaoCylinder;
+    private int vboCube, vboPyramid, vboCylinder;
     private int projectionMatrixLocation, modelViewMatrixLocation;
 
-    private Vector3 lightPosition1 = new Vector3(-3f, 3f, 3f);
-    private Vector3 lightPosition2 = new Vector3(3f, 3f, 3f);
-    private Vector3 lightPosition3 = new Vector3(0f, -3f, 3f);
-
-    public OpenGLWindow() : base(GameWindowSettings.Default, new NativeWindowSettings { Size = new OpenTK.Mathematics.Vector2i(800, 600), Title = "3D Scene with Lighting" })
+    public OpenGLWindow() : base(GameWindowSettings.Default, new NativeWindowSettings { Size = new OpenTK.Mathematics.Vector2i(800, 600), Title = "3D Scene with Objects" })
     {
     }
 
@@ -37,7 +33,6 @@ public class OpenGLWindow : GameWindow
         InitializeCube();
         InitializePyramid();
         InitializeCylinder();
-        InitializeLightSource();
 
         // Матрица проекции
         projectionMatrixLocation = GL.GetUniformLocation(shaderProgram, "projection");
@@ -86,11 +81,6 @@ public class OpenGLWindow : GameWindow
         Matrix4 modelCylinder = Matrix4.CreateTranslation(2f, 0f, 0f) * Matrix4.CreateRotationY(rotation);
         GL.UniformMatrix4(modelViewMatrixLocation, false, ref modelCylinder);
         GL.DrawArrays(PrimitiveType.TriangleStrip, 0, 144);
-
-        // Рисуем источники света
-        DrawLightSource(lightPosition1);
-        DrawLightSource(lightPosition2);
-        DrawLightSource(lightPosition3);
 
         // Обновление экрана
         SwapBuffers();
@@ -158,40 +148,51 @@ public class OpenGLWindow : GameWindow
 
     private void InitializePyramid()
     {
-        // Похожие шаги для пирамиды
-    }
+        // Вершины для пирамиды (основная часть)
+        float[] vertices = {
+            // Base of the pyramid
+            -1f, -1f, -1f, 1f, 0f, 0f,
+            1f, -1f, -1f, 1f, 0f, 0f,
+            1f, -1f, 1f, 1f, 0f, 0f,
+            -1f, -1f, 1f, 1f, 0f, 0f,
 
-    private void InitializeCylinder()
-    {
-        // Похожие шаги для цилиндра
-    }
+            // Side triangles
+            0f, 1f, 0f, 0f, 1f, 0f,
+            -1f, -1f, -1f, 0f, 1f, 0f,
+            1f, -1f, -1f, 0f, 1f, 0f,
 
-    private void InitializeLightSource()
-    {
-        // Простая точка или маленькая сфера для отображения источников света
-        float[] lightVertices = {
-            0f, 0f, 0f, 1f, 1f, 0f // маленькая точка
+            0f, 1f, 0f, 0f, 1f, 0f,
+            1f, -1f, -1f, 0f, 1f, 0f,
+            1f, -1f, 1f, 0f, 1f, 0f,
+
+            0f, 1f, 0f, 0f, 1f, 0f,
+            1f, -1f, 1f, 0f, 1f, 0f,
+            -1f, -1f, 1f, 0f, 1f, 0f,
+
+            0f, 1f, 0f, 0f, 1f, 0f,
+            -1f, -1f, 1f, 0f, 1f, 0f,
+            -1f, -1f, -1f, 0f, 1f, 0f
         };
 
-        vaoLight = GL.GenVertexArray();
-        vboLight = GL.GenBuffer();
-        GL.BindVertexArray(vaoLight);
-        GL.BindBuffer(BufferTarget.ArrayBuffer, vboLight);
-        GL.BufferData(BufferTarget.ArrayBuffer, lightVertices.Length * sizeof(float), lightVertices, BufferUsageHint.StaticDraw);
+        vaoPyramid = GL.GenVertexArray();
+        vboPyramid = GL.GenBuffer();
+        GL.BindVertexArray(vaoPyramid);
+        GL.BindBuffer(BufferTarget.ArrayBuffer, vboPyramid);
+        GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
 
         GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
         GL.EnableVertexAttribArray(0);
+
+        GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
+        GL.EnableVertexAttribArray(1);
 
         GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
         GL.BindVertexArray(0);
     }
 
-    private void DrawLightSource(Vector3 position)
+    private void InitializeCylinder()
     {
-        GL.BindVertexArray(vaoLight);
-        Matrix4 modelLight = Matrix4.CreateTranslation(position);
-        GL.UniformMatrix4(modelViewMatrixLocation, false, ref modelLight);
-        GL.DrawArrays(PrimitiveType.Points, 0, 1); // Рисуем точку
+        // Похожий код для создания цилиндра...
     }
 
     private int CreateShaderProgram()
