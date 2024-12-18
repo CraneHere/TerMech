@@ -9,19 +9,12 @@ namespace CompGraph
 {
     public class Game : GameWindow
     {
-        private VertexBuffer vertexBuffer;
-        private IndexBuffer indexBuffer;
-        private VertexArray vertexArray;
         private Shader shaderProgram;
+        private int cubeVao;
+        private int pyramidVao;
+        private int cylinderVao;
 
-        private int vertexCount;
-        private int indexCount;
-
-        private Vector2[] initialShape;
-        private Vector2[] currentShape;
-        private Vector2 movementDirection = new Vector2(0.1f, 0); // Направление перемещения
-
-        public Game(int width = 1280, int height = 768, string title = "Game1")
+        public Game(int width = 1280, int height = 768, string title = "3D Scene")
             : base(
                   GameWindowSettings.Default,
                   new NativeWindowSettings()
@@ -29,7 +22,7 @@ namespace CompGraph
                       Title = title,
                       Size = new Vector2i(width, height),
                       WindowBorder = WindowBorder.Fixed,
-                      StartVisible = true, // Видимость окна включена для проверки
+                      StartVisible = true,
                       StartFocused = true,
                       API = ContextAPI.OpenGL,
                       Profile = ContextProfile.Core,
@@ -47,138 +40,171 @@ namespace CompGraph
 
         protected override void OnLoad()
         {
-            GL.ClearColor(0.8f, 0.8f, 0.8f, 1f);
-
-            this.initialShape = CreateHexagon(200, 200, 100);
-            this.currentShape = new Vector2[this.initialShape.Length];
-            Array.Copy(this.initialShape, this.currentShape, this.initialShape.Length);
-
-            VertexPositionColor[] vertices = new VertexPositionColor[this.currentShape.Length];
-            for (int i = 0; i < this.currentShape.Length; i++)
-            {
-                vertices[i] = new VertexPositionColor(this.currentShape[i], new Color4(0.2f, 0.4f, 0.8f, 1f));
-            }
-
-            this.vertexCount = vertices.Length;
-
-            int[] indices = new int[(this.vertexCount - 2) * 3];
-            for (int i = 1; i < this.vertexCount - 1; i++)
-            {
-                indices[(i - 1) * 3] = 0;
-                indices[(i - 1) * 3 + 1] = i;
-                indices[(i - 1) * 3 + 2] = i + 1;
-            }
-
-            this.indexCount = indices.Length;
-
-            this.vertexBuffer = new VertexBuffer(VertexPositionColor.VertexInfo, vertices.Length, true);
-            this.vertexBuffer.SetData(vertices, vertices.Length);
-
-            this.indexBuffer = new IndexBuffer(indices.Length, true);
-            this.indexBuffer.SetData(indices, indices.Length);
-
-            this.vertexArray = new VertexArray(this.vertexBuffer);
+            GL.ClearColor(0.1f, 0.1f, 0.1f, 1f);
 
             string vertexShaderCode =
                 @"
                 #version 330 core
 
-                uniform vec2 ViewportSize;
-                uniform float ColorFactor;
+                layout (location = 0) in vec3 aPosition;
+                layout (location = 1) in vec3 aColor;
 
-                layout (location = 0) in vec2 aPosition;
-                layout (location = 1) in vec4 aColor;
+                uniform mat4 model;
+                uniform mat4 view;
+                uniform mat4 projection;
 
-                out vec4 vColor;
+                out vec3 vColor;
 
                 void main()
                 {
-                    float nx = aPosition.x / ViewportSize.x * 2f - 1f;
-                    float ny = aPosition.y / ViewportSize.y * 2f - 1f;
-                    gl_Position = vec4(nx, ny, 0f, 1f);
-
-                    vColor = aColor * ColorFactor;
+                    gl_Position = projection * view * model * vec4(aPosition, 1.0);
+                    vColor = aColor;
                 }
                 ";
 
-            string pixelShaderCode =
+            string fragmentShaderCode =
                 @"
                 #version 330 core
 
-                in vec4 vColor;
-
+                in vec3 vColor;
                 out vec4 pixelColor;
 
                 void main()
                 {
-                    pixelColor = vColor;
+                    pixelColor = vec4(vColor, 1.0);
                 }
                 ";
 
-            this.shaderProgram = new Shader(vertexShaderCode, pixelShaderCode);
+            shaderProgram = new Shader(vertexShaderCode, fragmentShaderCode);
 
-            int[] viewport = new int[4];
-            GL.GetInteger(GetPName.Viewport, viewport);
+            cubeVao = CreateCube();
+            pyramidVao = CreatePyramid();
+            cylinderVao = CreateCylinder();
 
-            this.shaderProgram.SetUniform("ViewportSize", (float)viewport[2], (float)viewport[3]);
+            GL.Enable(EnableCap.DepthTest);
 
             base.OnLoad();
         }
 
-        private Vector2[] CreateHexagon(float centerX, float centerY, float radius)
+        private int CreateCube()
         {
-            Vector2[] vertices = new Vector2[6];
-            for (int i = 0; i < 6; i++)
-            {
-                float angle = MathHelper.TwoPi / 6 * i;
-                vertices[i] = new Vector2(
-                    centerX + radius * MathF.Cos(angle),
-                    centerY + radius * MathF.Sin(angle));
-            }
-            return vertices;
+            float[] vertices = {
+                // Positions         // Colors
+                -0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,
+                 0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
+                 0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
+                -0.5f,  0.5f, -0.5f,  1.0f, 1.0f, 0.0f,
+
+                -0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 1.0f,
+                 0.5f, -0.5f,  0.5f,  0.0f, 1.0f, 1.0f,
+                 0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 1.0f,
+                -0.5f,  0.5f,  0.5f,  0.5f, 0.5f, 0.5f
+            };
+
+            uint[] indices = {
+                0, 1, 2, 2, 3, 0,
+                4, 5, 6, 6, 7, 4,
+                0, 1, 5, 5, 4, 0,
+                2, 3, 7, 7, 6, 2,
+                0, 3, 7, 7, 4, 0,
+                1, 2, 6, 6, 5, 1
+            };
+
+            return CreateVao(vertices, indices);
         }
 
-        protected override void OnUnload()
+        private int CreatePyramid()
         {
-            this.vertexArray?.Dispose();
-            this.indexBuffer?.Dispose();
-            this.vertexBuffer?.Dispose();
+            float[] vertices = {
+                // Positions         // Colors
+                 0.0f,  0.5f,  0.0f,  1.0f, 0.0f, 0.0f,
+                -0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
+                 0.5f, -0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
+                 0.5f, -0.5f,  0.5f,  1.0f, 1.0f, 0.0f,
+                -0.5f, -0.5f,  0.5f,  0.0f, 1.0f, 1.0f
+            };
 
-            base.OnUnload();
+            uint[] indices = {
+                0, 1, 2,
+                0, 2, 3,
+                0, 3, 4,
+                0, 4, 1,
+                1, 2, 3, 3, 4, 1
+            };
+
+            return CreateVao(vertices, indices);
         }
 
-        protected override void OnUpdateFrame(FrameEventArgs args)
+        private int CreateCylinder()
         {
-            // Обновляем координаты текущих вершин, чтобы перемещать шестиугольник
-            for (int i = 0; i < currentShape.Length; i++)
+            const int segments = 36;
+            const float radius = 0.5f;
+            const float height = 1.0f;
+
+            float[] vertices = new float[segments * 12];
+            uint[] indices = new uint[segments * 6];
+
+            for (int i = 0; i < segments; i++)
             {
-                currentShape[i] += movementDirection; // Добавляем смещение к каждой вершине
+                float angle = MathHelper.TwoPi / segments * i;
+                float nextAngle = MathHelper.TwoPi / segments * (i + 1);
+
+                int v = i * 12;
+                vertices[v + 0] = MathF.Cos(angle) * radius; // Bottom circle
+                vertices[v + 1] = -height / 2;
+                vertices[v + 2] = MathF.Sin(angle) * radius;
+                vertices[v + 3] = 1.0f; // Color
+                vertices[v + 4] = 0.0f;
+                vertices[v + 5] = 0.0f;
+
+                vertices[v + 6] = MathF.Cos(angle) * radius; // Top circle
+                vertices[v + 7] = height / 2;
+                vertices[v + 8] = MathF.Sin(angle) * radius;
+                vertices[v + 9] = 0.0f;
+                vertices[v + 10] = 1.0f;
+                vertices[v + 11] = 0.0f;
+
+                int idx = i * 6;
+                indices[idx + 0] = (uint)(i * 2);
+                indices[idx + 1] = (uint)(i * 2 + 1);
+                indices[idx + 2] = (uint)((i * 2 + 2) % (segments * 2));
+                indices[idx + 3] = (uint)((i * 2 + 2) % (segments * 2));
+                indices[idx + 4] = (uint)(i * 2 + 1);
+                indices[idx + 5] = (uint)((i * 2 + 3) % (segments * 2));
             }
 
-            // Обновляем буфер вершин с новыми координатами
-            VertexPositionColor[] vertices = new VertexPositionColor[this.currentShape.Length];
-            for (int i = 0; i < this.currentShape.Length; i++)
-            {
-                vertices[i] = new VertexPositionColor(this.currentShape[i], new Color4(0.2f, 0.4f, 0.8f, 1f));
-            }
+            return CreateVao(vertices, indices);
+        }
 
-            this.vertexBuffer.SetData(vertices, vertices.Length);
+        private int CreateVao(float[] vertices, uint[] indices)
+        {
+            int vao = GL.GenVertexArray();
+            GL.BindVertexArray(vao);
 
-            base.OnUpdateFrame(args);
+            int vbo = GL.GenBuffer();
+            GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
+            GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
+
+            int ebo = GL.GenBuffer();
+            GL.BindBuffer(BufferTarget.ElementArrayBuffer, ebo);
+            GL.BufferData(BufferTarget.ElementArrayBuffer, indices.Length * sizeof(uint), indices, BufferUsageHint.StaticDraw);
+
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
+            GL.EnableVertexAttribArray(0);
+
+            GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
+            GL.EnableVertexAttribArray(1);
+
+            return vao;
         }
 
         protected override void OnRenderFrame(FrameEventArgs args)
         {
-            GL.Clear(ClearBufferMask.ColorBufferBit);
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-            GL.UseProgram(this.shaderProgram.ShaderProgramHandle);
+            Matrix4 view = Matrix4.LookAt(new Vector3(2, 2, 2), Vector3.Zero, Vector3.UnitY);
+            Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver4, Size.X / (float)Size.Y, 0.1f, 100f);
 
-            GL.BindVertexArray(this.vertexArray.VertexArrayHandle);
-            GL.BindBuffer(BufferTarget.ElementArrayBuffer, this.indexBuffer.IndexBufferHandle);
-            GL.DrawElements(PrimitiveType.Triangles, this.indexCount, DrawElementsType.UnsignedInt, 0);
+            shaderProgram.Use();
 
-            this.Context.SwapBuffers();
-            base.OnRenderFrame(args);
-        }
-    }
-}
+            shaderProgram
