@@ -207,4 +207,31 @@ namespace CompGraph
 
             shaderProgram.Use();
 
-            shaderProgram
+            shaderProgram.SetUniform("view", view);
+            shaderProgram.SetUniform("projection", projection);
+
+            Matrix4 model;
+
+            // Draw Cube
+            model = Matrix4.CreateTranslation(-1.0f, 0.0f, 0.0f);
+            shaderProgram.SetUniform("model", model);
+            GL.BindVertexArray(cubeVao);
+            GL.DrawElements(PrimitiveType.Triangles, 36, DrawElementsType.UnsignedInt, 0);
+
+            // Draw Pyramid
+            model = Matrix4.CreateTranslation(0.0f, 0.0f, 0.0f);
+            shaderProgram.SetUniform("model", model);
+            GL.BindVertexArray(pyramidVao);
+            GL.DrawElements(PrimitiveType.Triangles, 18, DrawElementsType.UnsignedInt, 0);
+
+            // Draw Cylinder
+            model = Matrix4.CreateTranslation(1.0f, 0.0f, 0.0f);
+            shaderProgram.SetUniform("model", model);
+            GL.BindVertexArray(cylinderVao);
+            GL.DrawElements(PrimitiveType.Triangles, 216, DrawElementsType.UnsignedInt, 0);
+
+            SwapBuffers();
+            base.OnRenderFrame(args);
+        }
+    }
+}
