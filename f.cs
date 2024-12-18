@@ -1,62 +1,223 @@
-using System;
+using OpenTK;
 using OpenTK.Graphics.OpenGL4;
+using OpenTK.Windowing.Common;
+using OpenTK.Windowing.Desktop;
+using System;
+using System.Numerics;
 
-namespace CompGraph
+public class OpenGLWindow : GameWindow
 {
-    public sealed class VertexArray : IDisposable
+    private float rotation = 0f;
+    
+    public OpenGLWindow() : base(GameWindowSettings.Default, NativeWindowSettings.Default)
     {
-        private bool disposed;
+    }
 
-        public readonly int VertexArrayHandle;
-        public readonly VertexBuffer VertexBuffer;
+    protected override void OnLoad()
+    {
+        base.OnLoad();
+        
+        // Инициализация OpenGL
+        GL.ClearColor(0.39f, 0.58f, 0.93f, 1.0f);  // Цвет фона (cornflower blue)
+        GL.Enable(EnableCap.DepthTest);  // Включаем тест глубины
 
-        public VertexArray(VertexBuffer vertexBuffer)
+        // Настройка перспективной проекции
+        Matrix4x4 projection = Matrix4x4.CreatePerspectiveFieldOfView(
+            MathHelper.DegreesToRadians(45), // угол обзора
+            Width / (float)Height,            // соотношение сторон
+            0.1f,                            // ближайшая плоскость отсечения
+            100f                             // дальняя плоскость отсечения
+        );
+        GL.MatrixMode(MatrixMode.Projection);
+        GL.LoadMatrix(ref projection);
+    }
+
+    protected override void OnRenderFrame(FrameEventArgs args)
+    {
+        base.OnRenderFrame(args);
+
+        // Очистка экрана
+        GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+        // Модельный обзор (сдвиг сцены, вращение объектов)
+        GL.MatrixMode(MatrixMode.Modelview);
+        GL.LoadIdentity();
+
+        // Камера
+        GL.Translate(0f, 0f, -6f);
+
+        // Рисуем объекты
+
+        // Куб
+        GL.PushMatrix();
+        GL.Rotate(rotation, 1.0f, 0.0f, 0.0f);
+        GL.Rotate(rotation, 0.0f, 1.0f, 0.0f);
+        DrawCube();
+        GL.PopMatrix();
+
+        // Пирамида
+        GL.PushMatrix();
+        GL.Translate(-2f, 0f, 0f);
+        GL.Rotate(rotation, 0.0f, 1.0f, 0.0f);
+        DrawPyramid();
+        GL.PopMatrix();
+
+        // Цилиндр
+        GL.PushMatrix();
+        GL.Translate(2f, 0f, 0f);
+        GL.Rotate(rotation, 0.0f, 1.0f, 0.0f);
+        DrawCylinder();
+        GL.PopMatrix();
+
+        // Источники света
+        DrawLightSource(-3f, 3f, 3f); // Источник света 1
+        DrawLightSource(3f, 3f, 3f);  // Источник света 2
+        DrawLightSource(0f, -3f, 3f); // Источник света 3
+
+        // Обновление экрана
+        SwapBuffers();
+
+        rotation += 0.5f;
+    }
+
+    private void DrawCube()
+    {
+        GL.Begin(PrimitiveType.Quads);
+
+        // Передняя грань
+        GL.Color3(1f, 0f, 0f); // Красный
+        GL.Vertex3(-1f, -1f, 1f);
+        GL.Vertex3(1f, -1f, 1f);
+        GL.Vertex3(1f, 1f, 1f);
+        GL.Vertex3(-1f, 1f, 1f);
+
+        // Задняя грань
+        GL.Color3(0f, 1f, 0f); // Зеленый
+        GL.Vertex3(-1f, -1f, -1f);
+        GL.Vertex3(-1f, 1f, -1f);
+        GL.Vertex3(1f, 1f, -1f);
+        GL.Vertex3(1f, -1f, -1f);
+
+        // Левые и правые грани
+        GL.Color3(0f, 0f, 1f); // Синий
+        GL.Vertex3(-1f, -1f, 1f);
+        GL.Vertex3(-1f, -1f, -1f);
+        GL.Vertex3(-1f, 1f, -1f);
+        GL.Vertex3(-1f, 1f, 1f);
+
+        GL.Vertex3(1f, -1f, 1f);
+        GL.Vertex3(1f, 1f, 1f);
+        GL.Vertex3(1f, 1f, -1f);
+        GL.Vertex3(1f, -1f, -1f);
+
+        // Верхняя и нижняя грань
+        GL.Color3(1f, 1f, 0f); // Желтый
+        GL.Vertex3(-1f, 1f, 1f);
+        GL.Vertex3(1f, 1f, 1f);
+        GL.Vertex3(1f, 1f, -1f);
+        GL.Vertex3(-1f, 1f, -1f);
+
+        GL.Vertex3(-1f, -1f, 1f);
+        GL.Vertex3(-1f, -1f, -1f);
+        GL.Vertex3(1f, -1f, -1f);
+        GL.Vertex3(1f, -1f, 1f);
+
+        GL.End();
+    }
+
+    private void DrawPyramid()
+    {
+        GL.Begin(PrimitiveType.Triangles);
+
+        GL.Color3(1f, 0f, 0f); // Красный
+        GL.Vertex3(0f, 1f, 0f);
+        GL.Vertex3(-1f, -1f, 1f);
+        GL.Vertex3(1f, -1f, 1f);
+
+        GL.Color3(0f, 1f, 0f); // Зеленый
+        GL.Vertex3(0f, 1f, 0f);
+        GL.Vertex3(1f, -1f, 1f);
+        GL.Vertex3(1f, -1f, -1f);
+
+        GL.Color3(0f, 0f, 1f); // Синий
+        GL.Vertex3(0f, 1f, 0f);
+        GL.Vertex3(1f, -1f, -1f);
+        GL.Vertex3(-1f, -1f, -1f);
+
+        GL.Color3(1f, 1f, 0f); // Желтый
+        GL.Vertex3(0f, 1f, 0f);
+        GL.Vertex3(-1f, -1f, -1f);
+        GL.Vertex3(-1f, -1f, 1f);
+
+        GL.End();
+    }
+
+    private void DrawCylinder()
+    {
+        float radius = 1f;
+        float height = 2f;
+        int slices = 36;
+
+        GL.Begin(PrimitiveType.TriangleFan);
+
+        GL.Color3(0f, 0f, 1f); // Синий
+        GL.Vertex3(0f, -height / 2, 0f); // Центральная точка основания
+        for (int i = 0; i <= slices; i++)
         {
-            this.disposed = false;
-
-            if (vertexBuffer is null)
-            {
-                throw new ArgumentNullException(nameof(vertexBuffer));
-            }
-
-            this.VertexBuffer = vertexBuffer;
-
-            int vertexSizeInBytes = this.VertexBuffer.VertexInfo.SizeInBytes;
-            VertexAttribute[] attributes = this.VertexBuffer.VertexInfo.VertexAttributes;
-
-
-            this.VertexArrayHandle = GL.GenVertexArray();
-            GL.BindVertexArray(this.VertexArrayHandle);
-
-            GL.BindBuffer(BufferTarget.ArrayBuffer, this.VertexBuffer.VertexBufferHandle);
-
-            for (int i = 0; i < attributes.Length; i++)
-            {
-                VertexAttribute attribute = attributes[i];
-                GL.VertexAttribPointer(attribute.Index, attribute.ComponentCount, VertexAttribPointerType.Float, false, vertexSizeInBytes, attribute.Offset);
-                GL.EnableVertexAttribArray(attribute.Index);
-            }
-
-            GL.BindVertexArray(0);
+            float angle = MathHelper.TwoPi * i / slices;
+            float x = radius * (float)Math.Cos(angle);
+            float z = radius * (float)Math.Sin(angle);
+            GL.Vertex3(x, -height / 2, z);
         }
 
-        ~VertexArray()
+        GL.End();
+
+        GL.Begin(PrimitiveType.TriangleFan);
+
+        GL.Color3(1f, 0f, 0f); // Красный
+        GL.Vertex3(0f, height / 2, 0f); // Центральная точка верхней части
+        for (int i = 0; i <= slices; i++)
         {
-            this.Dispose();
+            float angle = MathHelper.TwoPi * i / slices;
+            float x = radius * (float)Math.Cos(angle);
+            float z = radius * (float)Math.Sin(angle);
+            GL.Vertex3(x, height / 2, z);
         }
 
-        public void Dispose()
+        GL.End();
+
+        // Боковые грани
+        GL.Begin(PrimitiveType.QuadStrip);
+        for (int i = 0; i <= slices; i++)
         {
-            if (this.disposed)
-            {
-                return;
-            }
+            float angle = MathHelper.TwoPi * i / slices;
+            float x = radius * (float)Math.Cos(angle);
+            float z = radius * (float)Math.Sin(angle);
 
-            GL.BindVertexArray(0);
-            GL.DeleteVertexArray(this.VertexArrayHandle);
+            GL.Color3(0f, 1f, 0f); // Зеленый
+            GL.Vertex3(x, -height / 2, z);
+            GL.Vertex3(x, height / 2, z);
+        }
 
-            this.disposed = true;
-            GC.SuppressFinalize(this);
+        GL.End();
+    }
+
+    private void DrawLightSource(float x, float y, float z)
+    {
+        GL.PushMatrix();
+        GL.Translate(x, y, z);
+        GL.Color3(1f, 1f, 1f);
+        GL.Begin(PrimitiveType.Spheres);
+        GL.Vertex3(0f, 0f, 0f);
+        GL.End();
+        GL.PopMatrix();
+    }
+
+    public static void Main()
+    {
+        using (var window = new OpenGLWindow())
+        {
+            window.Run();
         }
     }
 }
