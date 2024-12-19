@@ -162,3 +162,12 @@ public void SetVector3(string name, Vector3 vector)
         GL.Uniform3(location, vector);
     }
 }
+----------------------------------------
+public void SetFloat(string name, float value)
+{
+    int location = GL.GetUniformLocation(Handle, name);
+    if (location != -1)
+    {
+        GL.Uniform1(location, value);
+    }
+}
