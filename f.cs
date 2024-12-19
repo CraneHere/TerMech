@@ -1,144 +1,133 @@
+using System;
 using OpenTK;
 using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
-using System;
 
-class MyGame : GameWindow
+namespace OpenTK3DScene
 {
-    private Matrix4 _projectionMatrix;
-    
-    public MyGame()
-        : base(800, 600, GraphicsMode.Default, "3D Scene with OpenTK")
+    class Program : GameWindow
     {
-        VSync = VSyncMode.On;
-    }
+        private float _angle = 0f;
+        private float _radius = 5f;
 
-    protected override void OnLoad(EventArgs e)
-    {
-        base.OnLoad(e);
-        GL.ClearColor(Color4.CornflowerBlue);
-        GL.Enable(EnableCap.DepthTest);
-
-        _projectionMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver4, Width / (float)Height, 0.1f, 100.0f);
-    }
-
-    protected override void OnResize(EventArgs e)
-    {
-        base.OnResize(e);
-        GL.Viewport(ClientRectangle);
-    }
-
-    protected override void OnUpdateFrame(FrameEventArgs e)
-    {
-        base.OnUpdateFrame(e);
-
-        if (Keyboard[Key.Escape])
+        public Program() : base(800, 600, GraphicsMode.Default, "3D Scene with Moving Camera")
         {
-            Exit();
+            VSync = VSyncMode.On;
         }
-    }
 
-    protected override void OnRenderFrame(FrameEventArgs e)
-    {
-        base.OnRenderFrame(e);
-
-        GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-
-        Matrix4 modelView = Matrix4.LookAt(Vector3.UnitZ * 5, Vector3.Zero, Vector3.UnitY);
-        GL.MatrixMode(MatrixMode.Modelview);
-        GL.LoadMatrix(ref modelView);
-        GL.MatrixMode(MatrixMode.Projection);
-        GL.LoadMatrix(ref _projectionMatrix);
-
-        // Рисуем объекты
-        DrawCube();
-        DrawPyramid();
-        DrawCylinder();
-        
-        // Рисуем источники света как сферы
-        DrawLightSources();
-
-        SwapBuffers();
-    }
-
-    private void DrawCube()
-    {
-        GL.Begin(PrimitiveType.Quads);
-        
-        GL.Color3(1.0, 0.0, 0.0); // Красный цвет
-        // Front face
-        GL.Vertex3(-1.0, -1.0, 1.0);
-        GL.Vertex3(1.0, -1.0, 1.0);
-        GL.Vertex3(1.0, 1.0, 1.0);
-        GL.Vertex3(-1.0, 1.0, 1.0);
-        
-        // Repeat for other faces...
-
-        GL.End();
-    }
-
-    private void DrawPyramid()
-    {
-        GL.Begin(PrimitiveType.Triangles);
-
-        GL.Color3(0.0, 1.0, 0.0); // Зеленый цвет
-        // Base
-        GL.Vertex3(-1.0, -1.0, -1.0);
-        GL.Vertex3(1.0, -1.0, -1.0);
-        GL.Vertex3(1.0, -1.0, 1.0);
-        GL.Vertex3(-1.0, -1.0, 1.0);
-
-        // Sides
-        GL.Vertex3(0.0, 1.0, 0.0); // Apex
-        GL.Vertex3(-1.0, -1.0, -1.0);
-        GL.Vertex3(1.0, -1.0, -1.0);
-
-        // Repeat for other sides...
-
-        GL.End();
-    }
-
-    private void DrawCylinder()
-    {
-        GL.Begin(PrimitiveType.QuadStrip);
-
-        GL.Color3(0.0, 0.0, 1.0); // Синий цвет
-        float radius = 1.0f;
-        float height = 2.0f;
-        int segments = 32;
-
-        for (int i = 0; i <= segments; i++)
+        protected override void OnLoad(EventArgs e)
         {
-            float theta = (float)i / segments * MathHelper.TwoPi;
-            float x = radius * (float)Math.Cos(theta);
-            float z = radius * (float)Math.Sin(theta);
+            base.OnLoad(e);
 
-            GL.Vertex3(x, -height / 2, z);
-            GL.Vertex3(x, height / 2, z);
+            GL.ClearColor(Color4.CornflowerBlue);
+            GL.Enable(EnableCap.DepthTest);
         }
-        
-        GL.End();
-    }
 
-    private void DrawLightSources()
-    {
-        GL.Begin(PrimitiveType.Points);
-
-        GL.Color3(1.0, 1.0, 0.0); // Желтый цвет для источников света
-        GL.Vertex3(2.0, 2.0, 2.0);
-        GL.Vertex3(-2.0, 2.0, 2.0);
-        GL.Vertex3(0.0, 2.0, -2.0);
-
-        GL.End();
-    }
-
-    [STAThread]
-    static void Main()
-    {
-        using (MyGame game = new MyGame())
+        protected override void OnResize(EventArgs e)
         {
-            game.Run(60.0);
+            base.OnResize(e);
+
+            GL.Viewport(0, 0, Width, Height);
+
+            Matrix4 perspective = Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver4, Width / (float)Height, 0.1f, 100f);
+            GL.MatrixMode(MatrixMode.Projection);
+            GL.LoadMatrix(ref perspective);
+        }
+
+        protected override void OnUpdateFrame(FrameEventArgs e)
+        {
+            base.OnUpdateFrame(e);
+
+            if (Keyboard.GetState().IsKeyDown(Key.Escape))
+                Exit();
+
+            _angle += 0.5f * (float)e.Time; // Угол увеличивается для движения камеры
+        }
+
+        protected override void OnRenderFrame(FrameEventArgs e)
+        {
+            base.OnRenderFrame(e);
+
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+            // Устанавливаем видовую матрицу
+            float camX = (float)(Math.Cos(_angle) * _radius);
+            float camZ = (float)(Math.Sin(_angle) * _radius);
+
+            Matrix4 view = Matrix4.LookAt(new Vector3(camX, 2.0f, camZ), Vector3.Zero, Vector3.UnitY);
+            GL.MatrixMode(MatrixMode.Modelview);
+            GL.LoadMatrix(ref view);
+
+            // Рисуем объекты сцены
+            DrawCube(-1.5f, 0f, -2f);
+            DrawCube(1.5f, 0f, -2f);
+            DrawCube(0f, 0f, 0f);
+
+            SwapBuffers();
+        }
+
+        private void DrawCube(float x, float y, float z)
+        {
+            GL.PushMatrix();
+            GL.Translate(x, y, z);
+
+            GL.Begin(PrimitiveType.Quads);
+
+            // Верхняя грань
+            GL.Color3(Color4.Red);
+            GL.Vertex3(-0.5f, 0.5f, -0.5f);
+            GL.Vertex3(0.5f, 0.5f, -0.5f);
+            GL.Vertex3(0.5f, 0.5f, 0.5f);
+            GL.Vertex3(-0.5f, 0.5f, 0.5f);
+
+            // Нижняя грань
+            GL.Color3(Color4.Green);
+            GL.Vertex3(-0.5f, -0.5f, -0.5f);
+            GL.Vertex3(0.5f, -0.5f, -0.5f);
+            GL.Vertex3(0.5f, -0.5f, 0.5f);
+            GL.Vertex3(-0.5f, -0.5f, 0.5f);
+
+            // Передняя грань
+            GL.Color3(Color4.Blue);
+            GL.Vertex3(-0.5f, -0.5f, 0.5f);
+            GL.Vertex3(0.5f, -0.5f, 0.5f);
+            GL.Vertex3(0.5f, 0.5f, 0.5f);
+            GL.Vertex3(-0.5f, 0.5f, 0.5f);
+
+            // Задняя грань
+            GL.Color3(Color4.Yellow);
+            GL.Vertex3(-0.5f, -0.5f, -0.5f);
+            GL.Vertex3(0.5f, -0.5f, -0.5f);
+            GL.Vertex3(0.5f, 0.5f, -0.5f);
+            GL.Vertex3(-0.5f, 0.5f, -0.5f);
+
+            // Левая грань
+            GL.Color3(Color4.Cyan);
+            GL.Vertex3(-0.5f, -0.5f, -0.5f);
+            GL.Vertex3(-0.5f, -0.5f, 0.5f);
+            GL.Vertex3(-0.5f, 0.5f, 0.5f);
+            GL.Vertex3(-0.5f, 0.5f, -0.5f);
+
+            // Правая грань
+            GL.Color3(Color4.Magenta);
+            GL.Vertex3(0.5f, -0.5f, -0.5f);
+            GL.Vertex3(0.5f, -0.5f, 0.5f);
+            GL.Vertex3(0.5f, 0.5f, 0.5f);
+            GL.Vertex3(0.5f, 0.5f, -0.5f);
+
+            GL.End();
+
+            GL.PopMatrix();
+        }
+
+        [STAThread]
+        static void Main(string[] args)
+        {
+            using (var program = new Program())
+            {
+                program.Run(60.0);
+            }
         }
     }
 }
