@@ -1,47 +1,67 @@
-protected override void OnLoad()
+#version 330 core
+
+layout (location = 0) in vec3 aPos;
+
+out vec3 RayDirection;
+
+void main()
 {
-    base.OnLoad();
+    // Преобразуем координаты вершины
+    gl_Position = vec4(aPos, 1.0);
 
-    float[] vertices = {
-        -1.0f, -1.0f, 0.0f,
-         1.0f, -1.0f, 0.0f,
-         1.0f,  1.0f, 0.0f,
-        -1.0f,  1.0f, 0.0f,
-    };
+    // Направление луча
+    RayDirection = normalize(aPos);
+}
 
-    uint[] indices = {
-        0, 1, 2,
-        2, 3, 0
-    };
+#version 330 core
 
-    _vao = GL.GenVertexArray();
-    _vbo = GL.GenBuffer();
-    int ebo = GL.GenBuffer();
+out vec4 FragColor;
 
+in vec3 RayDirection;
+
+uniform vec3 Sphere1Position;
+uniform float SphereRadius;
+uniform vec3 LightPosition;
+
+void main()
+{
+    vec3 rayOrigin = vec3(0.0, 0.0, 0.0);
+
+    // Трассировка сферы
+    vec3 oc = rayOrigin - Sphere1Position;
+    float b = 2.0 * dot(oc, RayDirection);
+    float c = dot(oc, oc) - SphereRadius * SphereRadius;
+    float discriminant = b * b - 4.0 * c;
+
+    if (discriminant < 0.0)
+    {
+        // Промах
+        FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    else
+    {
+        // Попадание
+        float t = (-b - sqrt(discriminant)) / 2.0;
+        vec3 hitPoint = rayOrigin + t * RayDirection;
+        vec3 normal = normalize(hitPoint - Sphere1Position);
+
+        vec3 lightDir = normalize(LightPosition - hitPoint);
+        float diff = max(dot(normal, lightDir), 0.0);
+
+        FragColor = vec4(vec3(diff), 1.0);
+    }
+}
+
+protected override void OnRenderFrame(FrameEventArgs args)
+{
+    base.OnRenderFrame(args);
+
+    GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+    _shader.Use();
     GL.BindVertexArray(_vao);
 
-    GL.BindBuffer(BufferTarget.ArrayBuffer, _vbo);
-    GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
+    GL.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, 0);
 
-    GL.BindBuffer(BufferTarget.ElementArrayBuffer, ebo);
-    GL.BufferData(BufferTarget.ElementArrayBuffer, indices.Length * sizeof(uint), indices, BufferUsageHint.StaticDraw);
-
-    GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
-    GL.EnableVertexAttribArray(0);
-
-    GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
-    GL.BindVertexArray(0);
-
-    // Загружаем шейдеры
-    _shader = new Shader();
-    _shader.Use();
-
-    // Устанавливаем параметры
-    _shader.SetVector3("Sphere1Position", new Vector3(-1.5f, 0.0f, -5.0f));
-    _shader.SetVector3("Sphere2Position", new Vector3(1.5f, 0.0f, -5.0f));
-    _shader.SetVector3("Sphere3Position", new Vector3(0.0f, 1.5f, -5.0f));
-    _shader.SetVector3("PlaneNormal", new Vector3(0.0f, 1.0f, 0.0f));
-    _shader.SetFloat("SphereRadius", 1.0f);
-    _shader.SetVector3("LightPosition", new Vector3(0.0f, 5.0f, -3.0f));
-    _shader.SetVector3("CameraPosition", new Vector3(0.0f, 0.0f, 0.0f));
+    SwapBuffers();
 }
