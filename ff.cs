@@ -41,64 +41,73 @@ bool intersectPlane(vec3 origin, vec3 dir, vec3 normal, out float t) {
     return false;
 }
 
-vec3 traceRay(vec3 origin, vec3 dir, int depth) {
-    if (depth >= MAX_DEPTH) return vec3(0.0); // Terminate recursion
+vec3 traceRay(vec3 origin, vec3 dir) {
+    vec3 color = vec3(0.0); // Final color
+    vec3 attenuation = vec3(1.0); // Light attenuation through reflections
+    vec3 currentOrigin = origin;
+    vec3 currentDir = dir;
 
-    float t;
-    vec3 hitColor = vec3(0.0);
+    for (int depth = 0; depth < MAX_DEPTH; depth++) {
+        float t;
+        vec3 hitNormal;
+        vec3 hitPoint;
+        float closestT = 1e20; // Large initial value
+        bool hitSomething = false;
 
-    vec3 closestHitNormal;
-    vec3 closestHitPoint;
-    float closestT = 1e20; // Large initial value
-    bool hitSomething = false;
+        // Check sphere intersections
+        if (intersectSphere(currentOrigin, currentDir, Sphere1Position, SphereRadius, t) && t < closestT) {
+            closestT = t;
+            hitNormal = normalize((currentOrigin + t * currentDir) - Sphere1Position);
+            hitPoint = currentOrigin + t * currentDir;
+            hitSomething = true;
+        }
+        if (intersectSphere(currentOrigin, currentDir, Sphere2Position, SphereRadius, t) && t < closestT) {
+            closestT = t;
+            hitNormal = normalize((currentOrigin + t * currentDir) - Sphere2Position);
+            hitPoint = currentOrigin + t * currentDir;
+            hitSomething = true;
+        }
+        if (intersectSphere(currentOrigin, currentDir, Sphere3Position, SphereRadius, t) && t < closestT) {
+            closestT = t;
+            hitNormal = normalize((currentOrigin + t * currentDir) - Sphere3Position);
+            hitPoint = currentOrigin + t * currentDir;
+            hitSomething = true;
+        }
 
-    // Check sphere intersections
-    if (intersectSphere(origin, dir, Sphere1Position, SphereRadius, t) && t < closestT) {
-        closestT = t;
-        closestHitNormal = normalize((origin + t * dir) - Sphere1Position);
-        closestHitPoint = origin + t * dir;
-        hitSomething = true;
+        // Check plane intersection
+        if (intersectPlane(currentOrigin, currentDir, PlaneNormal, t) && t < closestT) {
+            closestT = t;
+            hitNormal = PlaneNormal;
+            hitPoint = currentOrigin + t * currentDir;
+            hitSomething = true;
+        }
+
+        if (hitSomething) {
+            // Calculate reflection
+            vec3 reflectedDir = reflectRay(currentDir, hitNormal);
+            currentDir = reflectedDir;
+            currentOrigin = hitPoint + 0.01 * hitNormal;
+
+            // Calculate basic lighting
+            vec3 lightDir = normalize(LightPosition - hitPoint);
+            float diff = max(dot(lightDir, hitNormal), 0.0);
+            vec3 diffuse = diff * vec3(0.8, 0.8, 0.8);
+
+            color += attenuation * diffuse;
+            attenuation *= 0.5; // Reduce intensity for each bounce
+        } else {
+            break; // No more intersections
+        }
     }
-    if (intersectSphere(origin, dir, Sphere2Position, SphereRadius, t) && t < closestT) {
-        closestT = t;
-        closestHitNormal = normalize((origin + t * dir) - Sphere2Position);
-        closestHitPoint = origin + t * dir;
-        hitSomething = true;
-    }
-    if (intersectSphere(origin, dir, Sphere3Position, SphereRadius, t) && t < closestT) {
-        closestT = t;
-        closestHitNormal = normalize((origin + t * dir) - Sphere3Position);
-        closestHitPoint = origin + t * dir;
-        hitSomething = true;
-    }
 
-    // Check plane intersection
-    if (intersectPlane(origin, dir, PlaneNormal, t) && t < closestT) {
-        closestT = t;
-        closestHitNormal = PlaneNormal;
-        closestHitPoint = origin + t * dir;
-        hitSomething = true;
-    }
-
-    if (hitSomething) {
-        vec3 reflectedDir = reflectRay(dir, closestHitNormal);
-        vec3 reflectedColor = traceRay(closestHitPoint + 0.01 * closestHitNormal, reflectedDir, depth + 1);
-
-        // Basic shading with light
-        vec3 lightDir = normalize(LightPosition - closestHitPoint);
-        float diff = max(dot(lightDir, closestHitNormal), 0.0);
-        vec3 diffuse = diff * vec3(0.8, 0.8, 0.8);
-
-        hitColor = diffuse + 0.5 * reflectedColor;
-    }
-
-    return hitColor;
+    return color;
 }
 
 void main() {
-    vec3 color = traceRay(RayOrigin, RayDirection, 0);
+    vec3 color = traceRay(RayOrigin, RayDirection);
     FragColor = vec4(color, 1.0);
 }
+
 
      
 -----------------------------------------------------------------------------------------------------
