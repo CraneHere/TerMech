@@ -1,194 +1,122 @@
-using System;
-using OpenTK.Windowing.Common;
-using OpenTK.Windowing.Desktop;
-using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL4;
-using OpenTK.Windowing.GraphicsLibraryFramework;
-
-namespace OpenTK4Scene
+public class Ray
 {
-    class Program : GameWindow
+    public Vector3 Origin { get; set; }
+    public Vector3 Direction { get; set; }
+
+    public Ray(Vector3 origin, Vector3 direction)
     {
-        private float _angle = 0f;
-        private float _radius = 5f;
+        Origin = origin;
+        Direction = direction;
+    }
+}
 
-        private int _vao;
-        private int _vbo;
-        private Shader _shader;
+public class Sphere
+{
+    public Vector3 Center { get; set; }
+    public float Radius { get; set; }
 
-        public Program() : base(GameWindowSettings.Default, NativeWindowSettings.Default)
+    public Sphere(Vector3 center, float radius)
+    {
+        Center = center;
+        Radius = radius;
+    }
+
+    // Функция пересечения луча с сферой
+    public bool Intersect(Ray ray, out float t)
+    {
+        t = 0;
+
+        Vector3 oc = ray.Origin - Center;
+        float a = Vector3.Dot(ray.Direction, ray.Direction);
+        float b = 2.0f * Vector3.Dot(oc, ray.Direction);
+        float c = Vector3.Dot(oc, oc) - Radius * Radius;
+        float discriminant = b * b - 4.0f * a * c;
+
+        if (discriminant > 0)
         {
-            Size = new Vector2i(800, 600);
-            Title = "Chill";
+            t = (-b - (float)Math.Sqrt(discriminant)) / (2.0f * a);
+            return true;
         }
 
-        protected override void OnLoad()
+        return false;
+    }
+}
+
+
+public class RayTracer
+{
+    public List<Sphere> Spheres { get; set; }
+
+    public RayTracer()
+    {
+        Spheres = new List<Sphere>();
+    }
+
+    // Трассировка луча по сцене
+    public Vector3 TraceRay(Ray ray)
+    {
+        float tMin = float.MaxValue;
+        Sphere closestSphere = null;
+
+        // Ищем ближайшую сферу
+        foreach (var sphere in Spheres)
         {
-            base.OnLoad();
-
-            float[] vertices = {
-                -1.0f, -1.0f, 0.0f,
-                 1.0f, -1.0f, 0.0f,
-                 1.0f,  1.0f, 0.0f,
-                -1.0f,  1.0f, 0.0f,
-            };
-
-            uint[] indices = {
-                0, 1, 2,
-                2, 3, 0
-            };
-
-            _vao = GL.GenVertexArray();
-            _vbo = GL.GenBuffer();
-            int ebo = GL.GenBuffer();
-
-            GL.BindVertexArray(_vao);
-
-            GL.BindBuffer(BufferTarget.ArrayBuffer, _vbo);
-            GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
-
-            GL.BindBuffer(BufferTarget.ElementArrayBuffer, ebo);
-            GL.BufferData(BufferTarget.ElementArrayBuffer, indices.Length * sizeof(uint), indices, BufferUsageHint.StaticDraw);
-
-            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
-            GL.EnableVertexAttribArray(0);
-
-            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
-            GL.BindVertexArray(0);
-
-            // Загружаем шейдеры
-            _shader = new Shader();
-            _shader.Use();
-
-            // Устанавливаем параметры
-            _shader.SetVector3("Sphere1Position", new Vector3(-1.5f, 0.0f, -5.0f));
-            _shader.SetVector3("Sphere2Position", new Vector3(1.5f, 0.0f, -5.0f));
-            _shader.SetVector3("Sphere3Position", new Vector3(0.0f, 1.5f, -5.0f));
-            _shader.SetVector3("PlaneNormal", new Vector3(0.0f, 1.0f, 0.0f));
-            _shader.SetFloat("SphereRadius", 1.0f);
-            _shader.SetVector3("LightPosition", new Vector3(0.0f, 5.0f, -3.0f));
-            _shader.SetVector3("CameraPosition", new Vector3(0.0f, 0.0f, 0.0f));
-        }
-
-        protected override void OnUnload()
-        {
-            base.OnUnload();
-
-        }
-
-        protected override void OnUpdateFrame(FrameEventArgs args)
-        {
-            base.OnUpdateFrame(args);
-        }
-
-        protected override void OnRenderFrame(FrameEventArgs args)
-        {
-            base.OnRenderFrame(args);
-
-            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-
-            _shader.Use();
-            GL.BindVertexArray(_vao);
-
-            GL.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, 0);
-
-            SwapBuffers();
-        }
-
-        [STAThread]
-        static void Main(string[] args)
-        {
-            using (var program = new Program())
+            if (sphere.Intersect(ray, out float t) && t < tMin)
             {
-                program.Run();
+                tMin = t;
+                closestSphere = sphere;
             }
+        }
+
+        if (closestSphere != null)
+        {
+            // Если луч пересекает сферу, возвращаем цвет
+            Vector3 intersectionPoint = ray.Origin + ray.Direction * tMin;
+            Vector3 normal = Vector3.Normalize(intersectionPoint - closestSphere.Center);
+            return CalculateColor(normal); // Просто пример цвета по нормали
+        }
+
+        return new Vector3(0.0f, 0.0f, 0.0f); // Фон
+    }
+
+    private Vector3 CalculateColor(Vector3 normal)
+    {
+        // Простейший цвет: чем больше угол между нормалью и направлением к свету, тем светлее
+        float brightness = Math.Max(Vector3.Dot(normal, new Vector3(1.0f, 1.0f, 1.0f)), 0.0f);
+        return new Vector3(brightness, brightness, brightness);
+    }
+}
+
+
+protected override void OnRenderFrame(FrameEventArgs args)
+{
+    base.OnRenderFrame(args);
+
+    GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+    // Рендеринг через трассировку лучей
+    var rayTracer = new RayTracer();
+    rayTracer.Spheres.Add(new Sphere(new Vector3(0.0f, 0.0f, -5.0f), 1.0f));
+
+    for (int y = 0; y < Size.Y; y++)
+    {
+        for (int x = 0; x < Size.X; x++)
+        {
+            // Рассчитываем направление луча для каждого пикселя
+            float xNorm = (x / (float)Size.X) * 2.0f - 1.0f;
+            float yNorm = (y / (float)Size.Y) * 2.0f - 1.0f;
+            Vector3 rayDirection = new Vector3(xNorm, yNorm, -1.0f); // Просто пример
+
+            Ray ray = new Ray(new Vector3(0.0f, 0.0f, 0.0f), rayDirection);
+            Vector3 color = rayTracer.TraceRay(ray);
+
+            // Устанавливаем цвет пикселя в OpenGL
+            GL.Color3(color.X, color.Y, color.Z);
+            GL.Begin(PrimitiveType.Points);
+            GL.Vertex2(x, y);
+            GL.End();
         }
     }
 
-    public class Shader : IDisposable
-    {
-        public int Handle { get; private set; }
-
-        public Shader(string vertexPath = "C:\\Users\\danil\\source\\repos\\CompGraph\\CompGraph\\Shaders\\shader.vert", 
-                      string fragmentPath = "C:\\Users\\danil\\source\\repos\\CompGraph\\CompGraph\\Shaders\\shader.frag")
-        {
-            string vertexSource = System.IO.File.ReadAllText(vertexPath);
-            string fragmentSource = System.IO.File.ReadAllText(fragmentPath);
-
-            int vertexShader = GL.CreateShader(ShaderType.VertexShader);
-            GL.ShaderSource(vertexShader, vertexSource);
-            GL.CompileShader(vertexShader);
-            CheckShaderCompileStatus(vertexShader);
-
-            int fragmentShader = GL.CreateShader(ShaderType.FragmentShader);
-            GL.ShaderSource(fragmentShader, fragmentSource);
-            GL.CompileShader(fragmentShader);
-            CheckShaderCompileStatus(fragmentShader);
-
-            Handle = GL.CreateProgram();
-            GL.AttachShader(Handle, vertexShader);
-            GL.AttachShader(Handle, fragmentShader);
-            GL.LinkProgram(Handle);
-            CheckProgramLinkStatus(Handle);
-
-            GL.DetachShader(Handle, vertexShader);
-            GL.DetachShader(Handle, fragmentShader);
-            GL.DeleteShader(vertexShader);
-            GL.DeleteShader(fragmentShader);
-        }
-
-        public void Use()
-        {
-            GL.UseProgram(Handle);
-        }
-
-        public void SetMatrix4(string name, Matrix4 matrix)
-        {
-            int location = GL.GetUniformLocation(Handle, name);
-            GL.UniformMatrix4(location, false, ref matrix);
-        }
-
-        public void SetFloat(string name, float value)
-        {
-            int location = GL.GetUniformLocation(Handle, name);
-            if (location != -1)
-            {
-                GL.Uniform1(location, value);
-            }
-        }
-        public void SetVector3(string name, Vector3 vector)
-        {
-            int location = GL.GetUniformLocation(Handle, name);
-            if (location != -1)
-            {
-                GL.Uniform3(location, vector);
-            }
-        }
-
-        private static void CheckShaderCompileStatus(int shader)
-        {
-            GL.GetShader(shader, ShaderParameter.CompileStatus, out int status);
-            if (status != (int)All.True)
-            {
-                string infoLog = GL.GetShaderInfoLog(shader);
-                Console.WriteLine($"Shader Info Log: {infoLog}");
-                throw new Exception($"Shader compilation failed: {infoLog}");
-            }
-        }
-
-        private static void CheckProgramLinkStatus(int program)
-        {
-            GL.GetProgram(program, GetProgramParameterName.LinkStatus, out int status);
-            if (status != (int)All.True)
-            {
-                string infoLog = GL.GetProgramInfoLog(program);
-                throw new Exception($"Program linking failed: {infoLog}");
-            }
-        }
-
-        public void Dispose()
-        {
-            GL.DeleteProgram(Handle);
-        }
-    }
+    SwapBuffers();
 }
