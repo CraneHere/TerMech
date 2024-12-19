@@ -153,3 +153,12 @@ protected override void OnUpdateFrame(FrameEventArgs args)
     // Clamp the shininess value
     _speed = MathHelper.Clamp(_speed, 0.1f, 128.0f);
 }
+
+public void SetVector3(string name, Vector3 vector)
+{
+    int location = GL.GetUniformLocation(Handle, name);
+    if (location != -1)
+    {
+        GL.Uniform3(location, vector);
+    }
+}
