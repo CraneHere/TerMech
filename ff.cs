@@ -145,4 +145,25 @@ protected override void OnRenderFrame(FrameEventArgs args)
 
 -----------------------------------------------------------------------------------------------------
 
+#version 330 core
+
+layout (location = 0) in vec3 aPos; // Позиция вершины
+
+out vec3 RayOrigin;     // Начало луча (камера)
+out vec3 RayDirection;  // Направление луча
+
+uniform mat4 viewMatrix;
+uniform mat4 projectionMatrix;
+
+void main()
+{
+    // Преобразуем вершину в пространство экрана
+    gl_Position = projectionMatrix * viewMatrix * vec4(aPos, 1.0);
+
+    // Лучи выходят из камеры, поэтому RayOrigin — в центре камеры
+    RayOrigin = vec3(0.0, 0.0, 0.0);
+
+    // Преобразуем координаты из пространства экрана в мировое пространство
+    RayDirection = normalize(aPos);
+}
 
