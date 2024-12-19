@@ -1,124 +1,138 @@
 using System;
-using OpenTK;
-using OpenTK.Graphics;
-using OpenTK.Graphics.OpenGL;
-using OpenTK.Input;
+using OpenTK.Windowing.Common;
+using OpenTK.Windowing.Desktop;
+using OpenTK.Mathematics;
+using OpenTK.Graphics.OpenGL4;
 
-namespace OpenTK3DScene
+namespace OpenTK4Scene
 {
     class Program : GameWindow
     {
         private float _angle = 0f;
         private float _radius = 5f;
 
-        public Program() : base(800, 600, GraphicsMode.Default, "3D Scene with Moving Camera")
+        private int _vao;
+        private int _vbo;
+        private Shader _shader;
+
+        private readonly float[] _vertices =
         {
-            VSync = VSyncMode.On;
+            // Positions         // Colors
+            -0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,
+             0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
+             0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
+            -0.5f,  0.5f, -0.5f,  1.0f, 1.0f, 0.0f,
+
+            -0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 1.0f,
+             0.5f, -0.5f,  0.5f,  0.0f, 1.0f, 1.0f,
+             0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 1.0f,
+            -0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 0.0f,
+        };
+
+        private readonly uint[] _indices =
+        {
+            0, 1, 2, 2, 3, 0,
+            4, 5, 6, 6, 7, 4,
+            0, 1, 5, 5, 4, 0,
+            2, 3, 7, 7, 6, 2,
+            0, 3, 7, 7, 4, 0,
+            1, 2, 6, 6, 5, 1
+        };
+
+        public Program() : base(GameWindowSettings.Default, NativeWindowSettings.Default)
+        {
+            Size = new Vector2i(800, 600);
+            Title = "3D Scene with Moving Camera (OpenTK 4.x)";
         }
 
-        protected override void OnLoad(EventArgs e)
+        protected override void OnLoad()
         {
-            base.OnLoad(e);
+            base.OnLoad();
 
             GL.ClearColor(Color4.CornflowerBlue);
             GL.Enable(EnableCap.DepthTest);
+
+            // Initialize shaders
+            _shader = new Shader("shader.vert", "shader.frag");
+            _shader.Use();
+
+            // Generate buffers and arrays
+            _vao = GL.GenVertexArray();
+            _vbo = GL.GenBuffer();
+            int ebo = GL.GenBuffer();
+
+            GL.BindVertexArray(_vao);
+
+            GL.BindBuffer(BufferTarget.ArrayBuffer, _vbo);
+            GL.BufferData(BufferTarget.ArrayBuffer, _vertices.Length * sizeof(float), _vertices, BufferUsageHint.StaticDraw);
+
+            GL.BindBuffer(BufferTarget.ElementArrayBuffer, ebo);
+            GL.BufferData(BufferTarget.ElementArrayBuffer, _indices.Length * sizeof(uint), _indices, BufferUsageHint.StaticDraw);
+
+            // Position attribute
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
+            GL.EnableVertexAttribArray(0);
+
+            // Color attribute
+            GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
+            GL.EnableVertexAttribArray(1);
+
+            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
+            GL.BindVertexArray(0);
         }
 
-        protected override void OnResize(EventArgs e)
+        protected override void OnUnload()
         {
-            base.OnResize(e);
+            base.OnUnload();
 
-            GL.Viewport(0, 0, Width, Height);
-
-            Matrix4 perspective = Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver4, Width / (float)Height, 0.1f, 100f);
-            GL.MatrixMode(MatrixMode.Projection);
-            GL.LoadMatrix(ref perspective);
+            GL.DeleteBuffer(_vbo);
+            GL.DeleteVertexArray(_vao);
+            _shader.Dispose();
         }
 
-        protected override void OnUpdateFrame(FrameEventArgs e)
+        protected override void OnUpdateFrame(FrameEventArgs args)
         {
-            base.OnUpdateFrame(e);
+            base.OnUpdateFrame(args);
 
-            if (Keyboard.GetState().IsKeyDown(Key.Escape))
-                Exit();
+            if (IsKeyDown(Keys.Escape))
+                Close();
 
-            _angle += 0.5f * (float)e.Time; // Угол увеличивается для движения камеры
+            _angle += 0.5f * (float)args.Time; // Update camera angle
         }
 
-        protected override void OnRenderFrame(FrameEventArgs e)
+        protected override void OnRenderFrame(FrameEventArgs args)
         {
-            base.OnRenderFrame(e);
+            base.OnRenderFrame(args);
 
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-            // Устанавливаем видовую матрицу
+            // Calculate view and projection matrices
             float camX = (float)(Math.Cos(_angle) * _radius);
             float camZ = (float)(Math.Sin(_angle) * _radius);
 
             Matrix4 view = Matrix4.LookAt(new Vector3(camX, 2.0f, camZ), Vector3.Zero, Vector3.UnitY);
-            GL.MatrixMode(MatrixMode.Modelview);
-            GL.LoadMatrix(ref view);
+            Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver4, Size.X / (float)Size.Y, 0.1f, 100f);
 
-            // Рисуем объекты сцены
-            DrawCube(-1.5f, 0f, -2f);
-            DrawCube(1.5f, 0f, -2f);
-            DrawCube(0f, 0f, 0f);
+            _shader.Use();
+            _shader.SetMatrix4("view", view);
+            _shader.SetMatrix4("projection", projection);
+
+            // Render cubes
+            GL.BindVertexArray(_vao);
+
+            Matrix4 model1 = Matrix4.CreateTranslation(-1.5f, 0f, -2f);
+            _shader.SetMatrix4("model", model1);
+            GL.DrawElements(PrimitiveType.Triangles, _indices.Length, DrawElementsType.UnsignedInt, 0);
+
+            Matrix4 model2 = Matrix4.CreateTranslation(1.5f, 0f, -2f);
+            _shader.SetMatrix4("model", model2);
+            GL.DrawElements(PrimitiveType.Triangles, _indices.Length, DrawElementsType.UnsignedInt, 0);
+
+            Matrix4 model3 = Matrix4.CreateTranslation(0f, 0f, 0f);
+            _shader.SetMatrix4("model", model3);
+            GL.DrawElements(PrimitiveType.Triangles, _indices.Length, DrawElementsType.UnsignedInt, 0);
 
             SwapBuffers();
-        }
-
-        private void DrawCube(float x, float y, float z)
-        {
-            GL.PushMatrix();
-            GL.Translate(x, y, z);
-
-            GL.Begin(PrimitiveType.Quads);
-
-            // Верхняя грань
-            GL.Color3(Color4.Red);
-            GL.Vertex3(-0.5f, 0.5f, -0.5f);
-            GL.Vertex3(0.5f, 0.5f, -0.5f);
-            GL.Vertex3(0.5f, 0.5f, 0.5f);
-            GL.Vertex3(-0.5f, 0.5f, 0.5f);
-
-            // Нижняя грань
-            GL.Color3(Color4.Green);
-            GL.Vertex3(-0.5f, -0.5f, -0.5f);
-            GL.Vertex3(0.5f, -0.5f, -0.5f);
-            GL.Vertex3(0.5f, -0.5f, 0.5f);
-            GL.Vertex3(-0.5f, -0.5f, 0.5f);
-
-            // Передняя грань
-            GL.Color3(Color4.Blue);
-            GL.Vertex3(-0.5f, -0.5f, 0.5f);
-            GL.Vertex3(0.5f, -0.5f, 0.5f);
-            GL.Vertex3(0.5f, 0.5f, 0.5f);
-            GL.Vertex3(-0.5f, 0.5f, 0.5f);
-
-            // Задняя грань
-            GL.Color3(Color4.Yellow);
-            GL.Vertex3(-0.5f, -0.5f, -0.5f);
-            GL.Vertex3(0.5f, -0.5f, -0.5f);
-            GL.Vertex3(0.5f, 0.5f, -0.5f);
-            GL.Vertex3(-0.5f, 0.5f, -0.5f);
-
-            // Левая грань
-            GL.Color3(Color4.Cyan);
-            GL.Vertex3(-0.5f, -0.5f, -0.5f);
-            GL.Vertex3(-0.5f, -0.5f, 0.5f);
-            GL.Vertex3(-0.5f, 0.5f, 0.5f);
-            GL.Vertex3(-0.5f, 0.5f, -0.5f);
-
-            // Правая грань
-            GL.Color3(Color4.Magenta);
-            GL.Vertex3(0.5f, -0.5f, -0.5f);
-            GL.Vertex3(0.5f, -0.5f, 0.5f);
-            GL.Vertex3(0.5f, 0.5f, 0.5f);
-            GL.Vertex3(0.5f, 0.5f, -0.5f);
-
-            GL.End();
-
-            GL.PopMatrix();
         }
 
         [STAThread]
@@ -126,7 +140,7 @@ namespace OpenTK3DScene
         {
             using (var program = new Program())
             {
-                program.Run(60.0);
+                program.Run();
             }
         }
     }
