@@ -26,7 +26,7 @@ void main()
     FragColor = vec4(ourColor, 1.0f);
 }
 
--------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
 using System;
 using OpenTK.Windowing.Common;
@@ -40,33 +40,25 @@ namespace OpenTK4Scene
 {
     class Program : GameWindow
     {
-        private float _angle = 0f;
-        private float _radius = 5f;
-
-        private int _vaoPlane;
-        private int _vboPlane;
-        private int _vaoSphere;
-        private int _vboSphere;
         private Shader _shader;
+        private int _vaoPlane, _vboPlane;
+        private int _vaoSphere, _vboSphere;
 
         private List<Vector3> _sphereVertices;
-
+        
         public Program() : base(GameWindowSettings.Default, NativeWindowSettings.Default)
         {
             Size = new Vector2i(800, 600);
-            Title = "Chill";
+            Title = "3D Scene with Spheres and Plane";
         }
 
         protected override void OnLoad()
         {
             base.OnLoad();
             _shader = new Shader();
-            
-            // Плоскость
             CreatePlane();
-            
-            // Сфера
             CreateSphere();
+            GL.Enable(EnableCap.DepthTest); // Включаем тест глубины для 3D
         }
 
         protected override void OnUnload()
@@ -93,9 +85,9 @@ namespace OpenTK4Scene
 
             _shader.Use();
 
-            // Математика для камеры
+            // Камера (view) и проекция
             Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(45f), (float)Width / (float)Height, 0.1f, 100f);
-            Matrix4 view = Matrix4.CreateTranslation(0f, 0f, -10f);
+            Matrix4 view = Matrix4.CreateLookAt(new Vector3(0f, 0f, 10f), Vector3.Zero, Vector3.UnitY); // Камера в позиции (0, 0, 10) смотрит в центр
 
             _shader.SetMatrix4("projection", projection);
             _shader.SetMatrix4("view", view);
@@ -103,12 +95,10 @@ namespace OpenTK4Scene
             // Рендерим плоскость
             RenderPlane();
 
-            // Рендерим первую сферу
-            RenderSphere(Vector3.Zero);
-            // Рендерим вторую сферу
-            RenderSphere(new Vector3(2f, 0f, 0f));
-            // Рендерим третью сферу
-            RenderSphere(new Vector3(-2f, 0f, 0f));
+            // Рендерим три сферы
+            RenderSphere(new Vector3(0f, 0f, 0f));  // Первая сфера в центре
+            RenderSphere(new Vector3(2f, 0f, 0f));  // Вторая сфера по оси X
+            RenderSphere(new Vector3(-2f, 0f, 0f)); // Третья сфера по оси X
 
             SwapBuffers();
         }
@@ -142,7 +132,7 @@ namespace OpenTK4Scene
 
         private void CreateSphere()
         {
-            // Создание простой сферы (позже можно будет улучшить создание сферы)
+            // Генерация вершины сферы
             _sphereVertices = new List<Vector3>();
             int sectors = 36;
             int stacks = 18;
@@ -184,7 +174,7 @@ namespace OpenTK4Scene
             _shader.Use();
             GL.BindVertexArray(_vaoPlane);
 
-            Matrix4 model = Matrix4.Identity;
+            Matrix4 model = Matrix4.Identity; // Плоскость на оси XZ
             _shader.SetMatrix4("model", model);
 
             GL.DrawArrays(PrimitiveType.TriangleFan, 0, 4);
@@ -196,11 +186,10 @@ namespace OpenTK4Scene
             _shader.Use();
             GL.BindVertexArray(_vaoSphere);
 
-            Matrix4 model = Matrix4.CreateTranslation(position);
+            Matrix4 model = Matrix4.CreateTranslation(position); // Трансляция на заданную позицию
             _shader.SetMatrix4("model", model);
 
-            GL.DrawArrays(PrimitiveType.TriangleFan, 0, _sphereVertices.Count);
-
+            GL.DrawArrays(PrimitiveType.TriangleFan, 0, _sphereVertices.Count); // Рендерим сферы
             GL.BindVertexArray(0);
         }
 
