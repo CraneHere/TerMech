@@ -18,6 +18,7 @@ namespace OpenTK4Scene
         // Преобразования
         private Matrix4 _view;
         private Matrix4 _projection;
+        private Matrix4 _model;
 
         public Program() : base(GameWindowSettings.Default, NativeWindowSettings.Default)
         {
@@ -42,6 +43,9 @@ namespace OpenTK4Scene
             // Настроим перспективную проекцию
             _projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(45f), Size.X / (float)Size.Y, 0.1f, 100f);
             _view = Matrix4.LookAt(new Vector3(0f, 0f, _radius), Vector3.Zero, Vector3.UnitY);
+            
+            // Начальная модель (для куба)
+            _model = Matrix4.Identity;
         }
 
         private void InitializeObjects()
@@ -107,6 +111,13 @@ namespace OpenTK4Scene
 
             if (KeyboardState.IsKeyDown(Keys.Escape))
                 Close();
+
+            // Увеличиваем угол вращения на каждом кадре
+            _angle += 0.5f;
+            if (_angle > 360f) _angle -= 360f;
+
+            // Обновляем модельную матрицу для вращения
+            _model = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(_angle));
         }
 
         protected override void OnRenderFrame(FrameEventArgs args)
@@ -117,14 +128,10 @@ namespace OpenTK4Scene
 
             _shader.Use();
 
-            // Модельное преобразование
-            Matrix4 model = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(_angle));
-            _angle += 0.5f;
-
-            // Обновляем матрицу вида
+            // Передаем матрицы в шейдер
+            _shader.SetMatrix4("model", _model);
             _shader.SetMatrix4("view", _view);
             _shader.SetMatrix4("projection", _projection);
-            _shader.SetMatrix4("model", model);
 
             // Рисуем куб
             GL.BindVertexArray(_vao);
