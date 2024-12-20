@@ -1,58 +1,134 @@
-#version 330 core
+using System;
+using OpenTK.Windowing.Common;
+using OpenTK.Windowing.Desktop;
+using OpenTK.Mathematics;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aNormal;
-
-out vec3 FragPos;
-out vec3 Normal;
-
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-
-void main()
+namespace OpenTK4Scene
 {
-    FragPos = vec3(model * vec4(aPos, 1.0));
-    Normal = mat3(transpose(inverse(model))) * aNormal;
+    class Program : GameWindow
+    {
+        private int _vaoCube, _vaoSphere, _vaoPyramid;
+        private Shader _shader;
+        private Matrix4 _view, _projection;
 
-    gl_Position = projection * view * vec4(FragPos, 1.0);
-}
+        private Vector3 _lightDirection = new Vector3(1.0f, -1.0f, 0.0f);
+        private Vector3 _pointLightPosition = new Vector3(2.0f, 2.0f, 2.0f);
 
-#version 330 core
+        public Program() : base(GameWindowSettings.Default, NativeWindowSettings.Default)
+        {
+            Size = new Vector2i(800, 600);
+            Title = "Lighting Scene";
+        }
 
-in vec3 FragPos;
-in vec3 Normal;
+        protected override void OnLoad()
+        {
+            base.OnLoad();
+            GL.ClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+            GL.Enable(EnableCap.DepthTest);
 
-out vec4 FragColor;
+            // Инициализация шейдеров
+            _shader = new Shader("path/to/shader.vert", "path/to/shader.frag");
 
-uniform vec3 directionalLight;
-uniform vec3 pointLightPosition;
+            // Создание VAO для каждого объекта
+            _vaoCube = CreateCubeVAO();
+            _vaoSphere = CreateSphereVAO();
+            _vaoPyramid = CreatePyramidVAO();
 
-uniform vec3 viewPos;
-uniform vec3 objectColor;
-uniform vec3 lightColor;
+            // Матрицы камеры
+            _view = Matrix4.LookAt(new Vector3(0, 3, 10), Vector3.Zero, Vector3.UnitY);
+            _projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(45f), Size.X / (float)Size.Y, 0.1f, 100f);
+        }
 
-void main()
-{
-    // Ambient lighting
-    float ambientStrength = 0.1;
-    vec3 ambient = ambientStrength * lightColor;
+        protected override void OnUnload()
+        {
+            base.OnUnload();
+            GL.DeleteVertexArray(_vaoCube);
+            GL.DeleteVertexArray(_vaoSphere);
+            GL.DeleteVertexArray(_vaoPyramid);
+            _shader.Dispose();
+        }
 
-    // Diffuse lighting for directional light
-    vec3 norm = normalize(Normal);
-    vec3 lightDir = normalize(-directionalLight);
-    float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = diff * lightColor;
+        protected override void OnUpdateFrame(FrameEventArgs args)
+        {
+            base.OnUpdateFrame(args);
 
-    // Specular lighting for point light
-    vec3 pointLightDir = normalize(pointLightPosition - FragPos);
-    float specularStrength = 0.5;
-    vec3 viewDir = normalize(viewPos - FragPos);
-    vec3 reflectDir = reflect(-pointLightDir, norm);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
-    vec3 specular = specularStrength * spec * lightColor;
+            if (KeyboardState.IsKeyDown(Keys.Escape))
+                Close();
+        }
 
-    // Combine results
-    vec3 result = (ambient + diffuse + specular) * objectColor;
-    FragColor = vec4(result, 1.0);
+        protected override void OnRenderFrame(FrameEventArgs args)
+        {
+            base.OnRenderFrame(args);
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+            _shader.Use();
+
+            // Установка матриц
+            _shader.SetMatrix4("view", _view);
+            _shader.SetMatrix4("projection", _projection);
+
+            // Установка освещения
+            _shader.SetVector3("lightDirection", _lightDirection);
+            _shader.SetVector3("pointLightPosition", _pointLightPosition);
+
+            // Рисуем объекты
+            DrawObject(_vaoCube, Matrix4.CreateTranslation(-2, 0, 0));
+            DrawObject(_vaoSphere, Matrix4.CreateTranslation(0, 0, 0));
+            DrawObject(_vaoPyramid, Matrix4.CreateTranslation(2, 0, 0));
+
+            SwapBuffers();
+        }
+
+        private void DrawObject(int vao, Matrix4 model)
+        {
+            _shader.SetMatrix4("model", model);
+            GL.BindVertexArray(vao);
+            GL.DrawArrays(PrimitiveType.Triangles, 0, 36);
+        }
+
+        private int CreateCubeVAO()
+        {
+            // Упрощённый код для создания куба
+            float[] vertices = { ... };
+
+            int vao = GL.GenVertexArray();
+            int vbo = GL.GenBuffer();
+
+            GL.BindVertexArray(vao);
+
+            GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
+            GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
+
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
+            GL.EnableVertexAttribArray(0);
+
+            GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
+            GL.EnableVertexAttribArray(1);
+
+            return vao;
+        }
+
+        private int CreateSphereVAO()
+        {
+            // Реализация создания VAO сферы
+            return 0;
+        }
+
+        private int CreatePyramidVAO()
+        {
+            // Реализация создания VAO пирамиды
+            return 0;
+        }
+
+        [STAThread]
+        static void Main(string[] args)
+        {
+            using (var program = new Program())
+            {
+                program.Run();
+            }
+        }
+    }
 }
