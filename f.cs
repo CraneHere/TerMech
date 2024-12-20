@@ -1,7 +1,26 @@
-public static class Vector3Extensions
+#version 330 core
+
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aColor;
+
+out vec3 vertexColor;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+void main()
 {
-    public static Vector3 Reflect(this Vector3 direction, Vector3 normal)
-    {
-        return direction - 2 * Vector3.Dot(direction, normal) * normal;
-    }
+    gl_Position = projection * view * model * vec4(aPosition, 1.0);
+    vertexColor = aColor;
+}
+
+#version 330 core
+
+in vec3 vertexColor;
+out vec4 FragColor;
+
+void main()
+{
+    FragColor = vec4(vertexColor, 1.0);
 }
