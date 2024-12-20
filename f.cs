@@ -9,9 +9,6 @@ namespace OpenTK4Scene
 {
     class Program : GameWindow
     {
-        private float _angle = 0f;
-        private float _radius = 5f;
-        
         private int _vao, _vbo, _ebo;
         private Shader _shader;
 
@@ -42,9 +39,9 @@ namespace OpenTK4Scene
 
             // Настроим перспективную проекцию
             _projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(45f), Size.X / (float)Size.Y, 0.1f, 100f);
-            _view = Matrix4.LookAt(new Vector3(0f, 0f, _radius), Vector3.Zero, Vector3.UnitY);
+            _view = Matrix4.LookAt(new Vector3(0f, 0f, 5f), Vector3.Zero, Vector3.UnitY);
             
-            // Начальная модель (для куба)
+            // Модельная матрица без вращения
             _model = Matrix4.Identity;
         }
 
@@ -112,12 +109,7 @@ namespace OpenTK4Scene
             if (KeyboardState.IsKeyDown(Keys.Escape))
                 Close();
 
-            // Увеличиваем угол вращения на каждом кадре
-            _angle += 0.5f;
-            if (_angle > 360f) _angle -= 360f;
-
-            // Обновляем модельную матрицу для вращения
-            _model = Matrix4.CreateRotationY(MathHelper.DegreesToRadians(_angle));
+            // Вращение больше не нужно, поэтому мы ничего не меняем в модели
         }
 
         protected override void OnRenderFrame(FrameEventArgs args)
