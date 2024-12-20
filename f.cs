@@ -1,61 +1,262 @@
-#version 330 core
+using System;
+using OpenTK.Windowing.Common;
+using OpenTK.Windowing.Desktop;
+using OpenTK.Mathematics;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 
-layout(location = 0) in vec3 aPosition;
-layout(location = 1) in vec3 aNormal;
-
-out vec3 FragPos;
-out vec3 Normal;
-
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-
-void main()
+namespace OpenTK4Scene
 {
-    FragPos = vec3(model * vec4(aPosition, 1.0));
-    Normal = mat3(transpose(inverse(model))) * aNormal;
+    class Program : GameWindow
+    {
+        private int _vaoCube, _vaoSphere, _vaoPyramid;
+        private Shader _shader;
+        private Matrix4 _view, _projection;
 
-    gl_Position = projection * view * vec4(FragPos, 1.0);
+        private Vector3 _lightDirection = new Vector3(1.0f, -1.0f, 0.0f);
+        private Vector3 _pointLightPosition = new Vector3(2.0f, 2.0f, 2.0f);
+
+        public Program() : base(GameWindowSettings.Default, NativeWindowSettings.Default)
+        {
+            Size = new Vector2i(800, 600);
+            Title = "Lighting Scene";
+        }
+
+        protected override void OnLoad()
+        {
+            base.OnLoad();
+            GL.ClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+            GL.Enable(EnableCap.DepthTest);
+
+            // Инициализация шейдеров
+            _shader = new Shader();
+
+            // Создание VAO для каждого объекта
+            _vaoCube = CreateCubeVAO();
+            _vaoSphere = CreateSphereVAO();
+            _vaoPyramid = CreatePyramidVAO();
+
+            // Матрицы камеры
+            _view = Matrix4.LookAt(new Vector3(0, 3, 10), Vector3.Zero, Vector3.UnitY);
+            _projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(45f), Size.X / (float)Size.Y, 0.1f, 100f);
+        }
+
+        protected override void OnUnload()
+        {
+            base.OnUnload();
+            GL.DeleteVertexArray(_vaoCube);
+            GL.DeleteVertexArray(_vaoSphere);
+            GL.DeleteVertexArray(_vaoPyramid);
+            _shader.Dispose();
+        }
+
+        protected override void OnUpdateFrame(FrameEventArgs args)
+        {
+            base.OnUpdateFrame(args);
+
+            if (KeyboardState.IsKeyDown(Keys.Escape))
+                Close();
+        }
+
+        protected override void OnRenderFrame(FrameEventArgs args)
+        {
+            base.OnRenderFrame(args);
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+            _shader.Use();
+
+            // Установка матриц
+            _shader.SetMatrix4("view", _view);
+            _shader.SetMatrix4("projection", _projection);
+
+            // Установка освещения
+            _shader.SetVector3("lightDirection", _lightDirection);
+            _shader.SetVector3("pointLightPosition", _pointLightPosition);
+
+            // Рисуем объекты
+            DrawObject(_vaoCube, Matrix4.CreateTranslation(-2, 0, 0));
+            DrawObject(_vaoSphere, Matrix4.CreateTranslation(0, 0, 0));
+            DrawObject(_vaoPyramid, Matrix4.CreateTranslation(2, 0, 0));
+
+            SwapBuffers();
+        }
+
+        private void DrawObject(int vao, Matrix4 model)
+        {
+            _shader.SetMatrix4("model", model);
+            GL.BindVertexArray(vao);
+            GL.DrawArrays(PrimitiveType.Triangles, 0, 36);
+        }
+
+        private int CreateCubeVAO()
+        {
+            float[] vertices = {
+                // Позиции         // Нормали
+                -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+                 0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+                 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+                 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+                -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+                -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+
+                -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+                 0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+                 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+                 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+                -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+                -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+
+                -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+                -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+                -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+                -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+                -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+                -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+
+                 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+                 0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+                 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+                 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+                 0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+                 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+
+                -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+                 0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+                 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+                 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+                -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+                -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+
+                -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+                 0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+                 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+                 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+                -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+                -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
+            };
+
+            int vao = GL.GenVertexArray();
+            int vbo = GL.GenBuffer();
+
+            GL.BindVertexArray(vao);
+
+            GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
+            GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
+
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
+            GL.EnableVertexAttribArray(0);
+
+            GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
+            GL.EnableVertexAttribArray(1);
+
+            return vao;
+        }
+
+        private int CreateSphereVAO()
+        {
+            // Реализация создания VAO сферы
+            return 0;
+        }
+
+        private int CreatePyramidVAO()
+        {
+            // Реализация создания VAO пирамиды
+            return 0;
+        }
+
+        [STAThread]
+        static void Main(string[] args)
+        {
+            using (var program = new Program())
+            {
+                program.Run();
+            }
+        }
+    }
 }
 
-#version 330 core
-
-in vec3 FragPos;
-in vec3 Normal;
-
-out vec4 FragColor;
-
-uniform vec3 lightDirection;
-uniform vec3 pointLightPosition;
-uniform vec3 viewPosition;
-
-// Материальные параметры
-uniform vec3 objectColor = vec3(1.0, 0.5, 0.31);
-uniform vec3 lightColor = vec3(1.0, 1.0, 1.0);
-
-// Функция расчёта диффузного освещения
-vec3 calculateDirectionalLight(vec3 normal, vec3 lightDir)
+public class Shader : IDisposable
 {
-    float diff = max(dot(normal, -lightDir), 0.0);
-    return lightColor * diff;
-}
+    public int Handle { get; private set; }
 
-// Функция расчёта точечного освещения
-vec3 calculatePointLight(vec3 fragPos, vec3 normal)
-{
-    vec3 lightDir = normalize(pointLightPosition - fragPos);
-    float diff = max(dot(normal, lightDir), 0.0);
-    float distance = length(pointLightPosition - fragPos);
-    float attenuation = 1.0 / (distance * distance);
-    return lightColor * diff * attenuation;
-}
+    public Shader(string vertexPath = "C:\\Users\\danil\\source\\repos\\CompGraph\\CompGraph\\Shaders\\shader.vert",
+                  string fragmentPath = "C:\\Users\\danil\\source\\repos\\CompGraph\\CompGraph\\Shaders\\shader.frag")
+    {
+        string vertexSource = System.IO.File.ReadAllText(vertexPath);
+        string fragmentSource = System.IO.File.ReadAllText(fragmentPath);
 
-void main()
-{
-    vec3 norm = normalize(Normal);
-    vec3 directionalLight = calculateDirectionalLight(norm, normalize(lightDirection));
-    vec3 pointLight = calculatePointLight(FragPos, norm);
+        int vertexShader = GL.CreateShader(ShaderType.VertexShader);
+        GL.ShaderSource(vertexShader, vertexSource);
+        GL.CompileShader(vertexShader);
+        CheckShaderCompileStatus(vertexShader);
 
-    vec3 result = (directionalLight + pointLight) * objectColor;
-    FragColor = vec4(result, 1.0);
+        int fragmentShader = GL.CreateShader(ShaderType.FragmentShader);
+        GL.ShaderSource(fragmentShader, fragmentSource);
+        GL.CompileShader(fragmentShader);
+        CheckShaderCompileStatus(fragmentShader);
+
+        Handle = GL.CreateProgram();
+        GL.AttachShader(Handle, vertexShader);
+        GL.AttachShader(Handle, fragmentShader);
+        GL.LinkProgram(Handle);
+        CheckProgramLinkStatus(Handle);
+
+        GL.DetachShader(Handle, vertexShader);
+        GL.DetachShader(Handle, fragmentShader);
+        GL.DeleteShader(vertexShader);
+        GL.DeleteShader(fragmentShader);
+    }
+
+    public void Use()
+    {
+        GL.UseProgram(Handle);
+    }
+
+    public void SetMatrix4(string name, Matrix4 matrix)
+    {
+        int location = GL.GetUniformLocation(Handle, name);
+        GL.UniformMatrix4(location, false, ref matrix);
+    }
+
+    public void SetFloat(string name, float value)
+    {
+        int location = GL.GetUniformLocation(Handle, name);
+        if (location != -1)
+        {
+            GL.Uniform1(location, value);
+        }
+    }
+    public void SetVector3(string name, Vector3 vector)
+    {
+        int location = GL.GetUniformLocation(Handle, name);
+        if (location != -1)
+        {
+            GL.Uniform3(location, vector);
+        }
+    }
+
+    private static void CheckShaderCompileStatus(int shader)
+    {
+        GL.GetShader(shader, ShaderParameter.CompileStatus, out int status);
+        if (status != (int)All.True)
+        {
+            string infoLog = GL.GetShaderInfoLog(shader);
+            throw new Exception($"Shader compilation failed: {infoLog}");
+        }
+    }
+
+    private static void CheckProgramLinkStatus(int program)
+    {
+        GL.GetProgram(program, GetProgramParameterName.LinkStatus, out int status);
+        if (status != (int)All.True)
+        {
+            string infoLog = GL.GetProgramInfoLog(program);
+            throw new Exception($"Program linking failed: {infoLog}");
+        }
+    }
+
+    public void Dispose()
+    {
+        GL.DeleteProgram(Handle);
+    }
 }
