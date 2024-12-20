@@ -9,123 +9,112 @@ namespace OpenTK4Scene
 {
     class Program : GameWindow
     {
-        private float _angle = 0f;
-        private float _radius = 5f;
-        private float _speed = 0.5f; // Camera speed
-
         private int _vao;
         private int _vbo;
         private Shader _shader;
 
-        private float[] _vertices = new float[]
-        {
-            // Positions           // Normals
-            0.0f,  1.0f,  0.0f,    0.0f,  1.0f,  0.0f, // Top vertex
-            -1.0f, -1.0f,  1.0f,    0.0f, -1.0f,  1.0f, // Bottom-left front
-            1.0f, -1.0f,  1.0f,     0.0f, -1.0f,  1.0f, // Bottom-right front
-            1.0f, -1.0f, -1.0f,     0.0f, -1.0f, -1.0f, // Bottom-right back
-            -1.0f, -1.0f, -1.0f,    0.0f, -1.0f, -1.0f, // Bottom-left back
-        };
+        private Vector3 _position = Vector3.Zero;
+        private float _scale = 1.0f;
+        private float _rotation = 0.0f;
 
-        private int[] _indices = new int[]
+        private readonly float[] _lineVertices =
         {
-            0, 1, 2,
-            0, 2, 3,
-            0, 3, 4,
-            0, 4, 1,
-            1, 2, 3,
-            1, 3, 4
+            -0.5f, 0.0f, 0.0f, // Start point
+             0.5f, 0.0f, 0.0f  // End point
         };
 
         public Program() : base(GameWindowSettings.Default, NativeWindowSettings.Default)
         {
             Size = new Vector2i(800, 600);
-            Title = "Chill";
+            Title = "Interactive Line";
         }
 
         protected override void OnLoad()
         {
             base.OnLoad();
 
+            // Compile and use shader
             _shader = new Shader();
+            _shader.Use();
 
-            // Create buffers
+            // Generate VAO and VBO
             _vao = GL.GenVertexArray();
             _vbo = GL.GenBuffer();
-            int ebo = GL.GenBuffer();
 
             GL.BindVertexArray(_vao);
-
-            // Bind VBO and EBO
             GL.BindBuffer(BufferTarget.ArrayBuffer, _vbo);
-            GL.BufferData(BufferTarget.ArrayBuffer, _vertices.Length * sizeof(float), _vertices, BufferUsageHint.StaticDraw);
+            GL.BufferData(BufferTarget.ArrayBuffer, _lineVertices.Length * sizeof(float), _lineVertices, BufferUsageHint.StaticDraw);
 
-            GL.BindBuffer(BufferTarget.ElementArrayBuffer, ebo);
-            GL.BufferData(BufferTarget.ElementArrayBuffer, _indices.Length * sizeof(int), _indices, BufferUsageHint.StaticDraw);
-
-            // Position attribute
-            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
             GL.EnableVertexAttribArray(0);
-
-            // Normal attribute
-            GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), (IntPtr)(3 * sizeof(float)));
-            GL.EnableVertexAttribArray(1);
 
             GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
             GL.BindVertexArray(0);
+
+            GL.ClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         }
 
         protected override void OnUnload()
         {
             base.OnUnload();
 
+            GL.DeleteBuffer(_vbo);
+            GL.DeleteVertexArray(_vao);
+            _shader.Dispose();
         }
 
         protected override void OnUpdateFrame(FrameEventArgs args)
         {
             base.OnUpdateFrame(args);
 
-            if (KeyboardState.IsKeyDown(Keys.Up)) _speed += 0.1f;
-            if (KeyboardState.IsKeyDown(Keys.Down)) _speed -= 0.1f;
+            var input = KeyboardState;
 
-            // Clamp the shininess value
-            _speed = MathHelper.Clamp(_speed, 0.1f, 128.0f);
+            if (input.IsKeyDown(Keys.Escape))
+                Close();
+
+            // Movement controls
+            if (input.IsKeyDown(Keys.W))
+                _position.Y += 1.0f * (float)args.Time;
+            if (input.IsKeyDown(Keys.S))
+                _position.Y -= 1.0f * (float)args.Time;
+            if (input.IsKeyDown(Keys.A))
+                _position.X -= 1.0f * (float)args.Time;
+            if (input.IsKeyDown(Keys.D))
+                _position.X += 1.0f * (float)args.Time;
+
+            // Scaling controls
+            if (input.IsKeyDown(Keys.Up))
+                _scale += 1.0f * (float)args.Time;
+            if (input.IsKeyDown(Keys.Down))
+                _scale -= 1.0f * (float)args.Time;
+
+            // Rotation controls
+            if (input.IsKeyDown(Keys.Left))
+                _rotation += 1.0f * (float)args.Time;
+            if (input.IsKeyDown(Keys.Right))
+                _rotation -= 1.0f * (float)args.Time;
         }
 
         protected override void OnRenderFrame(FrameEventArgs args)
         {
             base.OnRenderFrame(args);
 
-            GL.ClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+            GL.Clear(ClearBufferMask.ColorBufferBit);
 
             _shader.Use();
 
-            // Set up the camera
-            Matrix4 model = Matrix4.Identity;
-            Matrix4 view = Matrix4.LookAt(new Vector3(3.0f, 3.0f, 3.0f), Vector3.Zero, Vector3.UnitY);
-            Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(45f), (float)ClientSize.X / ClientSize.Y, 0.1f, 100f);
-            _shader.SetMatrix4("model", model);
-            _shader.SetMatrix4("view", view);
-            _shader.SetMatrix4("projection", projection);
+            // Create transformation matrix
+            var transform = Matrix4.CreateScale(_scale) *
+                            Matrix4.CreateRotationZ(_rotation) *
+                            Matrix4.CreateTranslation(_position);
 
-            // Set up light and camera positions
-            Vector3 lightPos = new Vector3(1.0f, 1.0f, 1.0f);
-            Vector3 viewPos = new Vector3(3.0f, 3.0f, 3.0f);
-            _shader.SetVector3("lightPos", lightPos);
-            _shader.SetVector3("viewPos", viewPos);
-
-            // Set up material properties
-            _shader.SetFloat("shininess", 32.0f); // Specular intensity
-
-            _shader.SetVector3("lightColor", new Vector3(1.0f, 1.0f, 1.0f)); // White light
-            _shader.SetVector3("objectColor", new Vector3(0.7f, 0.3f, 0.3f)); // Red object
+            _shader.SetMatrix4("uTransform", transform);
 
             GL.BindVertexArray(_vao);
-            GL.DrawElements(PrimitiveType.Triangles, _indices.Length, DrawElementsType.UnsignedInt, 0);
+            GL.DrawArrays(PrimitiveType.Lines, 0, 2);
             GL.BindVertexArray(0);
 
-            Context.SwapBuffers();
+            SwapBuffers();
         }
 
         [STAThread]
@@ -142,7 +131,7 @@ namespace OpenTK4Scene
     {
         public int Handle { get; private set; }
 
-        public Shader(string vertexPath = "C:\\Users\\danil\\source\\repos\\CompGraph\\CompGraph\\Shaders\\shader.vert", 
+        public Shader(string vertexPath = "C:\\Users\\danil\\source\\repos\\CompGraph\\CompGraph\\Shaders\\shader.vert",
                       string fragmentPath = "C:\\Users\\danil\\source\\repos\\CompGraph\\CompGraph\\Shaders\\shader.frag")
         {
             string vertexSource = System.IO.File.ReadAllText(vertexPath);
@@ -179,23 +168,6 @@ namespace OpenTK4Scene
         {
             int location = GL.GetUniformLocation(Handle, name);
             GL.UniformMatrix4(location, false, ref matrix);
-        }
-
-        public void SetFloat(string name, float value)
-        {
-            int location = GL.GetUniformLocation(Handle, name);
-            if (location != -1)
-            {
-                GL.Uniform1(location, value);
-            }
-        }
-        public void SetVector3(string name, Vector3 vector)
-        {
-            int location = GL.GetUniformLocation(Handle, name);
-            if (location != -1)
-            {
-                GL.Uniform3(location, vector);
-            }
         }
 
         private static void CheckShaderCompileStatus(int shader)
